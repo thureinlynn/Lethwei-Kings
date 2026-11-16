@@ -1,0 +1,90 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --font-display: 'Barlow Condensed', system-ui, sans-serif;
+    --font-sans: 'Plus Jakarta Sans', system-ui, sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+  }
+
+  body {
+    font-family: var(--font-sans);
+    background-color: #0e0f12;
+    color: #f5f2eb;
+    overflow-x: hidden;
+  }
+}
+
+.font-display {
+  font-family: var(--font-display);
+}
+
+.font-mono-num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Gritty comic halftone & ink border utilities */
+.comic-panel {
+  border: 2px solid #090a0c;
+  box-shadow: 4px 4px 0px #090a0c;
+}
+
+.comic-panel-sm {
+  border: 2px solid #090a0c;
+  box-shadow: 2px 2px 0px #090a0c;
+}
+
+.comic-text-stroke {
+  paint-order: stroke fill;
+  -webkit-text-stroke: 3px #090a0c;
+}
+
+.halftone-bg {
+  background-image: radial-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+  background-size: 12px 12px;
+}
+
+@keyframes hitShake {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  20% { transform: translate3d(-8px, 4px, 0) rotate(-1deg); }
+  40% { transform: translate3d(8px, -4px, 0) rotate(1deg); }
+  60% { transform: translate3d(-6px, -3px, 0) rotate(-0.5deg); }
+  80% { transform: translate3d(5px, 2px, 0) rotate(0.5deg); }
+}
+
+@keyframes heavyShake {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  15% { transform: translate3d(-14px, 6px, 0) rotate(-2deg); }
+  30% { transform: translate3d(14px, -7px, 0) rotate(2deg); }
+  45% { transform: translate3d(-11px, -5px, 0) rotate(-1.5deg); }
+  60% { transform: translate3d(10px, 5px, 0) rotate(1.5deg); }
+  75% { transform: translate3d(-6px, 2px, 0); }
+}
+
+@keyframes floatDamage {
+  0% { opacity: 0; transform: translate3d(-50%, 10px, 0) scale(0.75); }
+  18% { opacity: 1; transform: translate3d(-50%, -12px, 0) scale(1.15); }
+  80% { opacity: 1; transform: translate3d(-50%, -44px, 0) scale(1); }
+  100% { opacity: 0; transform: translate3d(-50%, -62px, 0) scale(0.95); }
+}
+
+.animate-hit-shake {
+  animation: hitShake 280ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.animate-heavy-shake {
+  animation: heavyShake 420ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.animate-float-damage {
+  animation: floatDamage 1.05s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-hit-shake,
+  .animate-heavy-shake,
+  .animate-float-damage {
+    animation: none !important;
+  }
+}

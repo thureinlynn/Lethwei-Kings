@@ -50,11 +50,14 @@ export async function generateAiFighterProfile(
   };
 }
 
-export async function generateAiSkillCard(prompt: string): Promise<CombatCard> {
+export async function generateAiSkillCard(
+  prompt: string,
+  lang: 'en' | 'my' = 'en'
+): Promise<CombatCard> {
   const res = await fetch('/api/ai/generate-card', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ prompt }),
+    body: JSON.stringify({ prompt, lang }),
   });
 
   const data = await res.json().catch(() => ({}));

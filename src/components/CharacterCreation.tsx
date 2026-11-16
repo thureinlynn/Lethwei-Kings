@@ -2,12 +2,14 @@ import React, { useState } from 'react';
 import {
   ArrowLeft,
   Check,
+  Globe,
   Loader2,
   Minus,
   Plus,
   ShieldAlert,
   Sparkles,
 } from 'lucide-react';
+import { GYM_MY, UI_TEXT } from '../i18n/translations';
 import {
   BIRTHPLACES,
   GYMS,
@@ -29,12 +31,15 @@ import {
   Gender,
   GymId,
   Hairstyle,
+  Language,
 } from '../types/game';
 import { generateAiFighterProfile } from '../utils/aiClient';
 import { soundEngine } from '../utils/sound';
 import { FighterAvatar } from './FighterAvatar';
 
 interface CharacterCreationProps {
+  lang: Language;
+  onToggleLang: () => void;
   onBack: () => void;
   onConfirm: (fighter: FighterProfile) => void;
 }
@@ -52,9 +57,12 @@ const BUILDS: BodyBuild[] = ['Lean', 'Athletic', 'Heavy'];
 type CreationSectionTab = 'identity' | 'appearance' | 'gym_stats';
 
 export const CharacterCreation: React.FC<CharacterCreationProps> = ({
+  lang,
+  onToggleLang,
   onBack,
   onConfirm,
 }) => {
+  const t = UI_TEXT[lang];
   const [sectionTab, setSectionTab] = useState<CreationSectionTab>('identity');
 
   const [name, setName] = useState('Kyaw Min');
@@ -212,40 +220,54 @@ export const CharacterCreation: React.FC<CharacterCreationProps> = ({
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#1a1d24] hover:bg-[#242832] text-zinc-200 text-xs font-semibold border border-zinc-700 cursor-pointer"
           >
             <ArrowLeft className="w-4 h-4" aria-hidden="true" />
-            <span>Title</span>
+            <span>{t.titleBtn}</span>
           </button>
           <div>
             <h1 className="font-display font-extrabold text-2xl sm:text-3xl tracking-wide text-white leading-none">
-              FIGHTER REGISTRATION
+              {t.fighterRegistration}
             </h1>
             <p className="text-[11px] text-zinc-400">
-              Standing Combat Only · Customize manually or scout a structured fighter with Gemini AI
+              {t.creationSubtitle}
             </p>
           </div>
         </div>
 
-        {/* AI Scout Fighter Bar (Gemini Structured Outputs) */}
-        <div className="hidden md:flex items-center gap-2">
-          <input
-            type="text"
-            value={aiPrompt}
-            onChange={(e) => setAiPrompt(e.target.value)}
-            placeholder="AI Scout theme (e.g. Kayin State elbow striker)"
-            aria-label="AI Scout Fighter Theme"
-            className="w-64 px-3 py-1.5 rounded-lg bg-[#0c0d11] border border-zinc-700 text-xs text-white focus:border-amber-400 focus:outline-none"
-          />
+        {/* AI Scout Fighter Bar + Language Toggle */}
+        <div className="flex items-center gap-2">
+          <div className="hidden md:flex items-center gap-2">
+            <input
+              type="text"
+              value={aiPrompt}
+              onChange={(e) => setAiPrompt(e.target.value)}
+              placeholder={t.aiScoutPlaceholder}
+              aria-label="AI Scout Fighter Theme"
+              className="w-56 px-3 py-1.5 rounded-lg bg-[#0c0d11] border border-zinc-700 text-xs text-white focus:border-amber-400 focus:outline-none"
+            />
+            <button
+              type="button"
+              disabled={aiLoading}
+              onClick={handleAiGenerateFighter}
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-black font-display font-bold text-sm tracking-wide comic-panel-sm cursor-pointer whitespace-nowrap"
+            >
+              {aiLoading ? (
+                <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
+              ) : (
+                <Sparkles className="w-4 h-4" aria-hidden="true" />
+              )}
+              <span>{aiLoading ? t.aiScouting : t.aiScoutBtn}</span>
+            </button>
+          </div>
           <button
             type="button"
-            disabled={aiLoading}
-            onClick={handleAiGenerateFighter}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-black font-display font-bold text-sm tracking-wide comic-panel-sm cursor-pointer whitespace-nowrap"
+            onClick={() => {
+              soundEngine.playClick();
+              onToggleLang();
+            }}
+            aria-label="Switch Language"
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#1a1d24] hover:bg-[#252a35] border border-amber-500/40 text-xs font-bold text-amber-300 cursor-pointer shrink-0"
           >
-            {aiLoading ? (
-              <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
-            ) : (
-              <Sparkles className="w-4 h-4" aria-hidden="true" />
-            )}
-            <span>{aiLoading ? 'SCOUTING...' : 'AI SCOUT FIGHTER'}</span>
+            <Globe className="w-3.5 h-3.5" aria-hidden="true" />
+            <span>{t.langToggle}</span>
           </button>
         </div>
       </header>
@@ -260,7 +282,7 @@ export const CharacterCreation: React.FC<CharacterCreationProps> = ({
           <div>
             <div className="flex items-center justify-between mb-2">
               <span className="font-display font-bold text-lg tracking-wide text-amber-400">
-                FIGHTER PREVIEW
+                {t.fighterPreview}
               </span>
               <span className="font-mono-num text-xs text-zinc-400">
                 {heightCm} cm · {weightKg} kg
@@ -321,19 +343,23 @@ export const CharacterCreation: React.FC<CharacterCreationProps> = ({
 
             <div className="grid grid-cols-2 gap-2.5 mb-2.5">
               <div className="p-2.5 rounded-lg bg-[#101217] border border-red-900/60">
-                <div className="text-[10px] uppercase text-red-400 font-bold">Starting Max HP</div>
+                <div className="text-[10px] uppercase text-red-400 font-bold">{t.startingMaxHp}</div>
                 <div className="font-mono-num font-bold text-xl text-white">{previewHp}</div>
               </div>
               <div className="p-2.5 rounded-lg bg-[#101217] border border-sky-900/60">
-                <div className="text-[10px] uppercase text-sky-400 font-bold">Starting Max STA</div>
+                <div className="text-[10px] uppercase text-sky-400 font-bold">{t.startingMaxSta}</div>
                 <div className="font-mono-num font-bold text-xl text-white">{previewSta}</div>
               </div>
             </div>
           </div>
 
           <div className="p-2.5 rounded-lg bg-[#101217] border border-zinc-800 text-xs text-zinc-300">
-            <div className="font-bold text-white">{GYMS[gymId].name}</div>
-            <div className="text-amber-300 text-[11px]">{GYMS[gymId].bonusSummary}</div>
+            <div className="font-bold text-white">
+              {lang === 'my' ? GYM_MY[gymId].name : GYMS[gymId].name}
+            </div>
+            <div className="text-amber-300 text-[11px]">
+              {lang === 'my' ? GYM_MY[gymId].bonusSummary : GYMS[gymId].bonusSummary}
+            </div>
           </div>
         </section>
 
@@ -343,25 +369,25 @@ export const CharacterCreation: React.FC<CharacterCreationProps> = ({
           <div className="shrink-0 grid grid-cols-3 gap-2 p-1 bg-[#161920] rounded-xl comic-panel-sm">
             {(
               [
-                { id: 'identity', label: '1. IDENTITY & GYM' },
-                { id: 'appearance', label: '2. APPEARANCE' },
-                { id: 'gym_stats', label: `3. ATTRIBUTES (${remainingPoints} LEFT)` },
+                { id: 'identity', label: t.tabIdentityGym },
+                { id: 'appearance', label: t.tabAppearance },
+                { id: 'gym_stats', label: `${t.tabAttributes} (${remainingPoints} ${t.leftLabel})` },
               ] as const
-            ).map((t) => (
+            ).map((tb) => (
               <button
-                key={t.id}
+                key={tb.id}
                 type="button"
                 onClick={() => {
                   soundEngine.playClick();
-                  setSectionTab(t.id);
+                  setSectionTab(tb.id);
                 }}
                 className={`py-2 px-3 rounded-lg font-display font-bold text-base tracking-wide cursor-pointer transition-colors ${
-                  sectionTab === t.id
+                  sectionTab === tb.id
                     ? 'bg-red-600 text-white'
                     : 'text-zinc-300 hover:bg-[#20242e]'
                 }`}
               >
-                {t.label}
+                {tb.label}
               </button>
             ))}
           </div>
@@ -373,7 +399,7 @@ export const CharacterCreation: React.FC<CharacterCreationProps> = ({
                 <div className="grid grid-cols-2 gap-3.5">
                   <div>
                     <label htmlFor="fighter-name" className="block text-xs font-semibold uppercase tracking-wider text-zinc-300 mb-1">
-                      Fighter Name *
+                      {t.fighterNameLabel}
                     </label>
                     <input
                       id="fighter-name"
@@ -389,7 +415,7 @@ export const CharacterCreation: React.FC<CharacterCreationProps> = ({
                   </div>
                   <div>
                     <label htmlFor="fighter-nickname" className="block text-xs font-semibold uppercase tracking-wider text-zinc-300 mb-1">
-                      Ring Nickname
+                      {t.nicknameLabel}
                     </label>
                     <input
                       id="fighter-nickname"
@@ -402,7 +428,7 @@ export const CharacterCreation: React.FC<CharacterCreationProps> = ({
                   </div>
                   <div>
                     <span className="block text-xs font-semibold uppercase tracking-wider text-zinc-300 mb-1">
-                      Gender
+                      {t.genderLabel}
                     </span>
                     <div className="grid grid-cols-2 gap-2">
                       {(['Male', 'Female'] as Gender[]).map((g) => (
@@ -416,7 +442,7 @@ export const CharacterCreation: React.FC<CharacterCreationProps> = ({
                               : 'bg-[#0f1116] border-zinc-700 text-zinc-300'
                           }`}
                         >
-                          {g}
+                          {g === 'Male' ? t.male : t.female}
                         </button>
                       ))}
                     </div>
@@ -424,7 +450,7 @@ export const CharacterCreation: React.FC<CharacterCreationProps> = ({
                   <div className="grid grid-cols-2 gap-2">
                     <div>
                       <label htmlFor="fighter-age" className="block text-xs font-semibold uppercase tracking-wider text-zinc-300 mb-1">
-                        Age ({age})
+                        {t.ageLabel} ({age})
                       </label>
                       <input
                         id="fighter-age"
@@ -438,7 +464,7 @@ export const CharacterCreation: React.FC<CharacterCreationProps> = ({
                     </div>
                     <div>
                       <label htmlFor="fighter-birthplace" className="block text-xs font-semibold uppercase tracking-wider text-zinc-300 mb-1">
-                        Birthplace
+                        {t.birthplaceLabel}
                       </label>
                       <select
                         id="fighter-birthplace"
@@ -458,11 +484,12 @@ export const CharacterCreation: React.FC<CharacterCreationProps> = ({
 
                 <div>
                   <h2 className="font-display font-bold text-lg text-white mb-2">
-                    STARTING GYM SELECTION
+                    {t.startingGymTitle}
                   </h2>
                   <div className="grid grid-cols-3 gap-3">
                     {Object.values(GYMS).map((g) => {
                       const active = gymId === g.id;
+                      const gymLoc = lang === 'my' ? GYM_MY[g.id] : g;
                       return (
                         <button
                           key={g.id}
@@ -480,14 +507,14 @@ export const CharacterCreation: React.FC<CharacterCreationProps> = ({
                           <div>
                             <div className="flex items-start justify-between gap-1">
                               <div className="font-display font-extrabold text-base text-white leading-tight">
-                                {g.name}
+                                {gymLoc.name}
                               </div>
                               {active && <Check className="w-4 h-4 text-amber-400 shrink-0" />}
                             </div>
-                            <div className="text-[11px] text-zinc-400 mt-0.5">{g.location}</div>
+                            <div className="text-[11px] text-zinc-400 mt-0.5">{gymLoc.location}</div>
                           </div>
                           <div className="mt-2 pt-2 border-t border-zinc-800 text-[11px] text-amber-300">
-                            {g.bonusSummary}
+                            {gymLoc.bonusSummary}
                           </div>
                         </button>
                       );
@@ -649,10 +676,10 @@ export const CharacterCreation: React.FC<CharacterCreationProps> = ({
                 <div className="grid grid-cols-2 gap-3.5">
                   {(
                     [
-                      { key: 'strength', label: 'Strength', desc: 'Boosts Striking DMG', color: 'text-red-400' },
-                      { key: 'speed', label: 'Speed', desc: 'SPD ties & Slip/Evade', color: 'text-emerald-400' },
-                      { key: 'stamina', label: 'Stamina', desc: 'Boosts Max STA', color: 'text-sky-400' },
-                      { key: 'durability', label: 'Durability / Chin', desc: 'Boosts Max HP & Block', color: 'text-amber-400' },
+                      { key: 'strength', label: t.strength, desc: lang === 'my' ? 'တိုက်ခိုက်အား DMG တိုးသည်' : 'Boosts Striking DMG', color: 'text-red-400' },
+                      { key: 'speed', label: t.speed, desc: lang === 'my' ? 'SPD အမြန်ဦးစားပေး & ရှောင်တိမ်း' : 'SPD ties & Slip/Evade', color: 'text-emerald-400' },
+                      { key: 'stamina', label: t.stamina, desc: lang === 'my' ? 'Max STA တိုးသည်' : 'Boosts Max STA', color: 'text-sky-400' },
+                      { key: 'durability', label: t.durability, desc: lang === 'my' ? 'Max HP & ကာကွယ်အား တိုးသည်' : 'Boosts Max HP & Block', color: 'text-amber-400' },
                     ] as const
                   ).map((item) => {
                     const val = stats[item.key];
@@ -710,7 +737,7 @@ export const CharacterCreation: React.FC<CharacterCreationProps> = ({
               </div>
             ) : (
               <span className="text-xs text-zinc-400">
-                10-card starter deck equipped automatically · Fully customizable in Game Plan
+                {t.starterDeckHint}
               </span>
             )}
 
@@ -718,7 +745,7 @@ export const CharacterCreation: React.FC<CharacterCreationProps> = ({
               type="submit"
               className="px-7 py-3 bg-red-600 hover:bg-red-500 text-white font-display font-extrabold text-xl tracking-wide rounded-lg comic-panel-sm cursor-pointer whitespace-nowrap"
             >
-              CONFIRM FIGHTER &amp; ENTER GYM
+              {t.confirmFighterBtn}
             </button>
           </div>
         </section>

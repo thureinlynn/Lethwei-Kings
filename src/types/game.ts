@@ -157,6 +157,8 @@ export interface OpponentProfile {
   isAiGenerated?: boolean;
 }
 
+export type Language = 'en' | 'my';
+
 export type FighterPose =
   | 'idle'
   | 'jab'
@@ -168,6 +170,8 @@ export type FighterPose =
   | 'slam'
   | 'block'
   | 'evade'
+  | 'parry'
+  | 'catchkick'
   | 'hit'
   | 'ko'
   | 'victory';
@@ -177,6 +181,19 @@ export interface FloatingPopup {
   target: 'player' | 'opponent';
   text: string;
   tone: 'damage' | 'heavy' | 'block' | 'evade' | 'cut' | 'heal' | 'counter';
+}
+
+export interface TurnExchangeStep {
+  actor: 'player' | 'ai';
+  defender: 'player' | 'ai';
+  actorPose: FighterPose;
+  defenderPose: FighterPose;
+  damageDealt: number;
+  counterDamage: number;
+  blocked: number;
+  evaded: boolean;
+  cutApplied: boolean;
+  isHeavy: boolean;
 }
 
 export interface TurnResolutionSummary {
@@ -195,6 +212,7 @@ export interface TurnResolutionSummary {
   aiCutApplied: boolean;
   playerHealed: number;
   aiHealed: number;
+  steps: TurnExchangeStep[];
   logs: string[];
 }
 

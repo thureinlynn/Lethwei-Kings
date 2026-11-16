@@ -1,6 +1,7 @@
 import React from 'react';
 import { Activity, Clock, Flame, Shield, Swords } from 'lucide-react';
-import { CardArtType, CombatCard as CombatCardType } from '../types/game';
+import { localizeCard, UI_TEXT } from '../i18n/translations';
+import { CardArtType, CombatCard as CombatCardType, Language } from '../types/game';
 
 interface CombatCardProps {
   card: CombatCardType;
@@ -8,6 +9,7 @@ interface CombatCardProps {
   disabled?: boolean;
   selected?: boolean;
   compact?: boolean;
+  lang?: Language;
   onClick?: () => void;
   actionLabel?: string;
 }
@@ -247,10 +249,13 @@ export const CombatCard: React.FC<CombatCardProps> = ({
   disabled = false,
   selected = false,
   compact = false,
+  lang = 'en',
   onClick,
   actionLabel,
 }) => {
   const powerValue = effectivePower ?? card.power;
+  const loc = localizeCard(card, lang);
+  const t = UI_TEXT[lang];
   const isDefense =
     card.category === 'Defense' ||
     card.specialEffect === 'adrenaline_sta' ||
@@ -267,17 +272,17 @@ export const CombatCard: React.FC<CombatCardProps> = ({
           : onClick
           ? 'hover:-translate-y-1.5 hover:ring-2 hover:ring-amber-400 cursor-pointer'
           : ''
-      } ${compact ? 'p-1.5' : 'p-1.5'}`}
+      } p-1.5`}
     >
       {/* Top Crimson Title Header (Matches Image 3) */}
       <div className="flex items-center justify-between gap-1 px-1 pb-1">
         <div
           className={`font-display font-extrabold tracking-wide leading-tight text-white truncate flex-1 text-center ${
-            compact ? 'text-xs' : 'text-sm sm:text-base'
+            compact ? 'text-xs' : lang === 'my' ? 'text-[13px]' : 'text-sm sm:text-base'
           }`}
-          title={card.name}
+          title={loc.name}
         >
-          {card.name}
+          {loc.name}
         </div>
         {card.isCustomAi && (
           <span className="text-[9px] font-bold uppercase px-1 rounded bg-amber-400 text-black shrink-0">
@@ -311,7 +316,7 @@ export const CombatCard: React.FC<CombatCardProps> = ({
 
       {/* Dark Charcoal Discipline Ribbon */}
       <div className="my-1 px-1.5 py-0.5 rounded-sm bg-[#231f20] border border-[#090a0c] text-center text-[10px] font-semibold tracking-wide text-[#f5eedc] truncate">
-        {card.strikeZone} ({card.discipline})
+        {loc.zoneLabel} ({loc.disciplineLabel})
       </div>
 
       {/* 3 Color-Coded Badges: Blue (STA), Red (DMG/DEF), Green (SPD) */}
@@ -319,10 +324,10 @@ export const CombatCard: React.FC<CombatCardProps> = ({
         {/* Blue STA */}
         <div
           className="flex items-center justify-center gap-0.5 rounded-sm bg-[#1d4ed8] border border-[#090a0c] py-0.5 px-1 text-white"
-          title="Stamina Cost"
+          title={t.badgeSta}
         >
           <Activity className="w-2.5 h-2.5 shrink-0 text-sky-200" aria-hidden="true" />
-          <span className="text-[9px] font-bold uppercase text-sky-100">STA</span>
+          <span className="text-[9px] font-bold uppercase text-sky-100">{t.badgeSta}</span>
           <span className="font-mono-num font-bold text-xs leading-none">{card.staCost}</span>
         </div>
 
@@ -331,10 +336,10 @@ export const CombatCard: React.FC<CombatCardProps> = ({
           className={`flex items-center justify-center gap-0.5 rounded-sm border border-[#090a0c] py-0.5 px-1 text-white ${
             isHeal ? 'bg-[#15803d]' : 'bg-[#b91c1c]'
           }`}
-          title={isHeal ? 'Heal % Max HP' : isDefense ? 'Defense Power' : 'Attack Damage'}
+          title={isHeal ? t.badgeHeal : isDefense ? t.badgeDef : t.badgeDmg}
         >
           <span className="text-[9px] font-bold uppercase">
-            {isHeal ? 'HEAL' : isDefense ? 'DEF' : 'DMG'}
+            {isHeal ? t.badgeHeal : isDefense ? t.badgeDef : t.badgeDmg}
           </span>
           <span className="font-mono-num font-bold text-xs leading-none">
             {isHeal ? `${powerValue}%` : powerValue}
@@ -344,19 +349,19 @@ export const CombatCard: React.FC<CombatCardProps> = ({
         {/* Green SPD */}
         <div
           className="flex items-center justify-center gap-0.5 rounded-sm bg-[#15803d] border border-[#090a0c] py-0.5 px-1 text-white"
-          title="Speed Priority (Lower Strikes First)"
+          title={t.badgeSpd}
         >
           <Clock className="w-2.5 h-2.5 shrink-0 text-emerald-200" aria-hidden="true" />
-          <span className="text-[9px] font-bold uppercase text-emerald-100">SPD</span>
+          <span className="text-[9px] font-bold uppercase text-emerald-100">{t.badgeSpd}</span>
           <span className="font-mono-num font-bold text-xs leading-none">{card.speed}</span>
         </div>
       </div>
 
       {/* Parchment Description Strip */}
       {!compact && (
-        <div className="mt-1 px-1.5 py-1 rounded-sm bg-[#dfd3b8] border border-[#090a0c] text-[#1c1917] h-[2.35rem] flex items-center">
-          <p className="text-[10px] font-medium leading-[1.2] line-clamp-2 w-full">
-            {card.description}
+        <div className="mt-1 px-1.5 py-1 rounded-sm bg-[#dfd3b8] border border-[#090a0c] text-[#1c1917] h-[2.5rem] flex items-center">
+          <p className="text-[10px] font-medium leading-[1.28] line-clamp-2 w-full">
+            {loc.description}
           </p>
         </div>
       )}
@@ -377,7 +382,7 @@ export const CombatCard: React.FC<CombatCardProps> = ({
       onClick={onClick}
       disabled={disabled}
       aria-pressed={selected}
-      aria-label={`${card.name}, ${card.discipline}, STA ${card.staCost}, ${
+      aria-label={`${loc.name}, ${loc.disciplineLabel}, STA ${card.staCost}, ${
         isHeal ? `Heal ${powerValue}%` : isDefense ? `DEF ${powerValue}` : `DMG ${powerValue}`
       }, SPD ${card.speed}`}
       className="text-left w-full focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 rounded-lg disabled:cursor-not-allowed"

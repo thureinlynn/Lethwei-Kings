@@ -1,7 +1,25 @@
 import { createNewFighter } from '../game/rules';
-import { FighterProfile } from '../types/game';
+import { FighterProfile, Language } from '../types/game';
 
 const STORAGE_KEY = 'lethwei_kings_career_v1';
+const LANG_KEY = 'lethwei_kings_lang_v1';
+
+export function saveLanguage(lang: Language): void {
+  try {
+    localStorage.setItem(LANG_KEY, lang);
+  } catch {
+    // Ignore
+  }
+}
+
+export function loadLanguage(): Language {
+  try {
+    const val = localStorage.getItem(LANG_KEY);
+    return val === 'my' ? 'my' : 'en';
+  } catch {
+    return 'en';
+  }
+}
 
 export function saveCareer(fighter: FighterProfile): void {
   try {

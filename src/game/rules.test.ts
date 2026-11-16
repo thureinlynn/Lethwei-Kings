@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { CARD_MAP } from '../data/cards';
 import {
   chooseAiAction,
+  chooseAutoTimeoutAction,
   CombatantState,
   createNewFighter,
   evaluateMatchOutcome,
@@ -100,6 +101,9 @@ test('lower SPD card strikes first and KO cancels slower opponent strike', () =>
   assert.equal(res.nextAiState.hp, 0);
   // Player took 0 damage because AI was KO'd before SPD 4 headbutt landed
   assert.equal(res.nextPlayerState.hp, 40);
+  assert.equal(res.summary.steps.length, 1);
+  assert.equal(res.summary.steps[0].actorPose, 'jab');
+  assert.equal(res.summary.steps[0].defenderPose, 'ko');
 });
 
 test('Catch Kick negates incoming kick and deals counter damage', () => {
@@ -121,6 +125,7 @@ test('Catch Kick negates incoming kick and deals counter damage', () => {
   assert.equal(res.nextPlayerState.hp, 80);
   assert.ok(res.nextAiState.hp < 80);
   assert.ok(res.summary.playerDamageDealt > 0);
+  assert.equal(res.summary.steps[0].defenderPose, 'catchkick');
 });
 
 test('Critical cards appear below 35% HP and Mani heals once per match', () => {
@@ -190,4 +195,34 @@ test('AI chooses REST when stamina is 0 and Body Slam keeps standing combat', ()
   );
   assert.equal(outcome.finished, true);
   assert.equal(outcome.winner, 'player');
+});
+
+test('Timeout auto-pick selects fastest affordable card and sequential steps record both strikes', () => {
+  const fresh = makeCombatant({ sta: 5 });
+  const autoPick = chooseAutoTimeoutAction(['lethwei_headbutt', 'straight_jab', 'low_kick'], fresh);
+  assert.notEqual(autoPick, 'REST');
+  if (autoPick !== 'REST') {
+    assert.equal(autoPick.id, 'straight_jab');
+  }
+
+  const res = resolveTurn({
+    roundNumber: 1,
+    turnNumber: 1,
+    playerChoice: CARD_MAP['spinning_elbow'], // SPD 4
+    aiChoice: CARD_MAP['low_kick'], // SPD 2
+    playerState: makeCombatant({ hp: 80 }),
+    aiState: makeCombatant({ hp: 80 }),
+    playerStats: { strength: 7, speed: 7, stamina: 6, durability: 7 },
+    aiStats: { strength: 6, speed: 6, stamina: 6, durability: 6 },
+    playerGymId: 'thuwunna',
+    rng: () => 0.5,
+  });
+
+  assert.equal(res.summary.firstMover, 'ai');
+  assert.equal(res.summary.steps.length, 2);
+  assert.equal(res.summary.steps[0].actor, 'ai');
+  assert.equal(res.summary.steps[0].actorPose, 'kick');
+  assert.equal(res.summary.steps[0].defenderPose, 'hit');
+  assert.equal(res.summary.steps[1].actor, 'player');
+  assert.equal(res.summary.steps[1].actorPose, 'elbow');
 });

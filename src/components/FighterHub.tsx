@@ -5,6 +5,7 @@ import {
   CheckCircle2,
   Dumbbell,
   Flame,
+  Globe,
   Heart,
   Home,
   Layers,
@@ -21,6 +22,13 @@ import {
 import { CARD_DATABASE, DEFAULT_STARTER_DECK, getCardById } from '../data/cards';
 import { DISCIPLINES, GYMS } from '../data/gyms';
 import {
+  CATEGORY_MY,
+  DISCIPLINE_MY,
+  GYM_MY,
+  localizeCard,
+  UI_TEXT,
+} from '../i18n/translations';
+import {
   CHAMPIONSHIP_UNLOCK_WINS,
   DECK_SIZE,
   isChampionshipUnlocked,
@@ -31,6 +39,7 @@ import {
   CombatCard as CombatCardType,
   Discipline,
   FighterProfile,
+  Language,
   MatchMode,
   OpponentProfile,
 } from '../types/game';
@@ -45,6 +54,8 @@ import { FighterAvatar } from './FighterAvatar';
 
 interface FighterHubProps {
   fighter: FighterProfile;
+  lang: Language;
+  onToggleLang: () => void;
   onUpdateFighter: (updated: FighterProfile) => void;
   onStartMatch: (mode: MatchMode, customOpponent?: OpponentProfile) => void;
   onBackToTitle: () => void;
@@ -54,10 +65,13 @@ type HubTab = 'arena' | 'training' | 'deck';
 
 export const FighterHub: React.FC<FighterHubProps> = ({
   fighter,
+  lang,
+  onToggleLang,
   onUpdateFighter,
   onStartMatch,
   onBackToTitle,
 }) => {
+  const t = UI_TEXT[lang];
   const [activeTab, setActiveTab] = useState<HubTab>('arena');
   const [selectedDiscipline, setSelectedDiscipline] = useState<Discipline>('Lethwei');
   const [deckFilter, setDeckFilter] = useState<'All' | CardCategory>('All');
@@ -73,6 +87,7 @@ export const FighterHub: React.FC<FighterHubProps> = ({
   const [aiRivalLoading, setAiRivalLoading] = useState(false);
 
   const gym = GYMS[fighter.gymId];
+  const gymDisplay = lang === 'my' ? GYM_MY[fighter.gymId] : gym;
   const champUnlocked = isChampionshipUnlocked(fighter);
   const customCards = fighter.customCards ?? [];
   const deckCheck = validateDeck(fighter.activeDeckIds, fighter.unlockedCardIds, customCards);
@@ -149,7 +164,8 @@ export const FighterHub: React.FC<FighterHubProps> = ({
     soundEngine.playClick();
     try {
       const card = await generateAiSkillCard(
-        aiCardPrompt || 'Devastating Myanmar Lethwei leaping elbow smash'
+        aiCardPrompt || 'Devastating Myanmar Lethwei leaping elbow smash',
+        lang
       );
       setPreviewAiCard(card);
       soundEngine.playBell(1);
@@ -271,18 +287,30 @@ export const FighterHub: React.FC<FighterHubProps> = ({
           </span>
           <span className="text-zinc-600">/</span>
           <span className="text-xs font-medium text-zinc-400">
-            {gym.name} · {gym.location}
+            {gymDisplay.name} · {gymDisplay.location}
           </span>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5">
           <div className="px-3 py-1 rounded-lg bg-[#161920] border border-amber-500/40 flex items-center gap-2">
             <Zap className="w-4 h-4 text-amber-400" aria-hidden="true" />
-            <span className="text-xs text-zinc-300">Training XP</span>
+            <span className="text-xs text-zinc-300">{t.trainingXp}</span>
             <span className="font-mono-num font-bold text-sm text-amber-300">
               {fighter.trainingXp}
             </span>
           </div>
+          <button
+            type="button"
+            onClick={() => {
+              soundEngine.playClick();
+              onToggleLang();
+            }}
+            aria-label="Switch Language"
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#161920] hover:bg-[#222630] border border-amber-500/40 text-xs font-bold text-amber-300 cursor-pointer"
+          >
+            <Globe className="w-3.5 h-3.5" aria-hidden="true" />
+            <span>{t.langToggle}</span>
+          </button>
           <button
             type="button"
             onClick={() => {
@@ -292,7 +320,7 @@ export const FighterHub: React.FC<FighterHubProps> = ({
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#161920] hover:bg-[#222630] border border-zinc-700 text-xs font-semibold text-zinc-200 cursor-pointer"
           >
             <Home className="w-4 h-4" aria-hidden="true" />
-            <span>Title</span>
+            <span>{t.titleBtn}</span>
           </button>
         </div>
       </header>
@@ -320,10 +348,10 @@ export const FighterHub: React.FC<FighterHubProps> = ({
                   &ldquo;{fighter.nickname}&rdquo;
                 </div>
                 <div className="text-[11px] text-zinc-400 mt-1">
-                  Age {fighter.age} · {fighter.birthplace}
+                  {t.ageLabel} {fighter.age} · {fighter.birthplace}
                 </div>
                 <div className="text-[11px] text-zinc-300 font-medium truncate">
-                  {gym.name}
+                  {gymDisplay.name}
                 </div>
               </div>
             </div>
@@ -337,19 +365,19 @@ export const FighterHub: React.FC<FighterHubProps> = ({
             {/* Record Strip */}
             <div className="grid grid-cols-3 gap-2 text-center">
               <div className="p-2 rounded-lg bg-[#101217] border border-zinc-800">
-                <div className="text-[10px] uppercase text-zinc-400 font-semibold">Wins</div>
+                <div className="text-[10px] uppercase text-zinc-400 font-semibold">{t.wins}</div>
                 <div className="font-mono-num font-bold text-lg text-emerald-400">
                   {fighter.record.wins}
                 </div>
               </div>
               <div className="p-2 rounded-lg bg-[#101217] border border-zinc-800">
-                <div className="text-[10px] uppercase text-zinc-400 font-semibold">Losses</div>
+                <div className="text-[10px] uppercase text-zinc-400 font-semibold">{t.losses}</div>
                 <div className="font-mono-num font-bold text-lg text-rose-400">
                   {fighter.record.losses}
                 </div>
               </div>
               <div className="p-2 rounded-lg bg-[#101217] border border-zinc-800">
-                <div className="text-[10px] uppercase text-zinc-400 font-semibold">KOs</div>
+                <div className="text-[10px] uppercase text-zinc-400 font-semibold">{t.kos}</div>
                 <div className="font-mono-num font-bold text-lg text-amber-400">
                   {fighter.record.kos}
                 </div>
@@ -362,7 +390,7 @@ export const FighterHub: React.FC<FighterHubProps> = ({
                 <div className="flex items-center justify-between text-xs font-semibold mb-1">
                   <span className="flex items-center gap-1 text-red-400">
                     <Heart className="w-3.5 h-3.5 fill-current" aria-hidden="true" />
-                    <span>HEALTH (HP)</span>
+                    <span>{t.healthHp}</span>
                   </span>
                   <span className="font-mono-num text-white">
                     {fighter.currentHp} / {fighter.maxHp}
@@ -380,7 +408,7 @@ export const FighterHub: React.FC<FighterHubProps> = ({
                 <div className="flex items-center justify-between text-xs font-semibold mb-1">
                   <span className="flex items-center gap-1 text-sky-400">
                     <Activity className="w-3.5 h-3.5" aria-hidden="true" />
-                    <span>STAMINA (STA)</span>
+                    <span>{t.staminaSta}</span>
                   </span>
                   <span className="font-mono-num text-white">
                     {fighter.currentSta} / {fighter.maxSta}
@@ -398,27 +426,27 @@ export const FighterHub: React.FC<FighterHubProps> = ({
             {/* Base Stats */}
             <div className="grid grid-cols-2 gap-2 text-xs">
               <div className="flex items-center justify-between px-2.5 py-1.5 rounded bg-[#101217] border border-zinc-800">
-                <span className="text-zinc-300">Strength</span>
+                <span className="text-zinc-300">{t.strength}</span>
                 <span className="font-mono-num font-bold text-red-400">{fighter.stats.strength}</span>
               </div>
               <div className="flex items-center justify-between px-2.5 py-1.5 rounded bg-[#101217] border border-zinc-800">
-                <span className="text-zinc-300">Speed</span>
+                <span className="text-zinc-300">{t.speed}</span>
                 <span className="font-mono-num font-bold text-emerald-400">{fighter.stats.speed}</span>
               </div>
               <div className="flex items-center justify-between px-2.5 py-1.5 rounded bg-[#101217] border border-zinc-800">
-                <span className="text-zinc-300">Stamina</span>
+                <span className="text-zinc-300">{t.stamina}</span>
                 <span className="font-mono-num font-bold text-sky-400">{fighter.stats.stamina}</span>
               </div>
               <div className="flex items-center justify-between px-2.5 py-1.5 rounded bg-[#101217] border border-zinc-800">
-                <span className="text-zinc-300">Durability</span>
+                <span className="text-zinc-300">{t.durability}</span>
                 <span className="font-mono-num font-bold text-amber-400">{fighter.stats.durability}</span>
               </div>
             </div>
           </div>
 
           <div className="mt-3 p-2.5 rounded-lg bg-[#101217] border border-zinc-800 text-[11px] text-zinc-300">
-            <div className="font-semibold text-amber-300">Gym Perk</div>
-            <div>{gym.bonusSummary}</div>
+            <div className="font-semibold text-amber-300">{t.gymPerk}</div>
+            <div>{gymDisplay.bonusSummary}</div>
           </div>
         </aside>
 
@@ -430,9 +458,9 @@ export const FighterHub: React.FC<FighterHubProps> = ({
           >
             {(
               [
-                { id: 'arena', label: 'FIGHT ARENA', icon: Swords },
-                { id: 'training', label: 'TRAINING CAMP', icon: Dumbbell },
-                { id: 'deck', label: 'GAME PLAN', icon: Layers },
+                { id: 'arena', label: t.tabArena, icon: Swords },
+                { id: 'training', label: t.tabTraining, icon: Dumbbell },
+                { id: 'deck', label: t.tabDeck, icon: Layers },
               ] as const
             ).map((tab) => {
               const Icon = tab.icon;
@@ -447,7 +475,7 @@ export const FighterHub: React.FC<FighterHubProps> = ({
                     setFeedback('');
                     setErrorBanner('');
                   }}
-                  className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg font-display font-bold text-lg tracking-wide transition-colors cursor-pointer whitespace-nowrap ${
+                  className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg font-display font-bold text-base sm:text-lg tracking-wide transition-colors cursor-pointer whitespace-nowrap ${
                     active
                       ? 'bg-red-600 text-white comic-panel-sm'
                       : 'text-zinc-300 hover:bg-[#20242e]'
@@ -525,7 +553,7 @@ export const FighterHub: React.FC<FighterHubProps> = ({
                     }}
                     className="px-5 py-3 rounded-lg bg-sky-600 hover:bg-sky-500 disabled:opacity-45 text-white font-display font-extrabold text-lg comic-panel-sm shrink-0 cursor-pointer whitespace-nowrap"
                   >
-                    START SPARRING
+                    {t.startSparring}
                   </button>
                 </div>
 
@@ -541,7 +569,7 @@ export const FighterHub: React.FC<FighterHubProps> = ({
                     <p className="text-xs text-zinc-300 mt-0.5">
                       Sanctioned 5-round Lethwei bouts (+55 XP win). Championship Qualifier:{' '}
                       <span className="font-mono-num font-bold text-amber-300">
-                        {Math.min(fighter.record.localWins, CHAMPIONSHIP_UNLOCK_WINS)} / {CHAMPIONSHIP_UNLOCK_WINS} Wins
+                        {Math.min(fighter.record.localWins, CHAMPIONSHIP_UNLOCK_WINS)} / {CHAMPIONSHIP_UNLOCK_WINS} {t.wins}
                       </span>
                     </p>
                   </div>
@@ -554,7 +582,7 @@ export const FighterHub: React.FC<FighterHubProps> = ({
                     }}
                     className="px-5 py-3 rounded-lg bg-red-600 hover:bg-red-500 disabled:opacity-45 text-white font-display font-extrabold text-lg comic-panel-sm shrink-0 cursor-pointer whitespace-nowrap"
                   >
-                    ENTER OFFICIAL BOUT
+                    {t.enterOfficialBout}
                   </button>
                 </div>
 
@@ -594,12 +622,12 @@ export const FighterHub: React.FC<FighterHubProps> = ({
                       }}
                       className="px-5 py-3 rounded-lg bg-amber-500 hover:bg-amber-400 text-black font-display font-extrabold text-lg comic-panel-sm shrink-0 cursor-pointer whitespace-nowrap"
                     >
-                      CHALLENGE FOR BELT
+                      {t.challengeBelt}
                     </button>
                   ) : (
                     <div className="flex items-center gap-1.5 px-4 py-2.5 rounded-lg bg-zinc-900 border border-zinc-700 text-zinc-400 font-display font-bold text-base shrink-0">
                       <Lock className="w-4 h-4" aria-hidden="true" />
-                      <span>LOCKED</span>
+                      <span>{t.locked}</span>
                     </div>
                   )}
                 </div>
@@ -633,7 +661,7 @@ export const FighterHub: React.FC<FighterHubProps> = ({
                       ) : (
                         <Swords className="w-4 h-4" aria-hidden="true" />
                       )}
-                      <span>{aiRivalLoading ? 'SUMMONING...' : 'FIGHT AI RIVAL'}</span>
+                      <span>{aiRivalLoading ? '...' : t.fightAiRival}</span>
                     </button>
                   </div>
                 </div>
@@ -677,21 +705,21 @@ export const FighterHub: React.FC<FighterHubProps> = ({
                       ) : (
                         <Sparkles className="w-4 h-4" aria-hidden="true" />
                       )}
-                      <span>{aiCardLoading ? 'FORGING...' : 'FORGE AI CARD'}</span>
+                      <span>{aiCardLoading ? '...' : t.forgeAiCard}</span>
                     </button>
                   </div>
 
                   {previewAiCard && (
                     <div className="p-3 rounded-lg bg-[#101217] border border-amber-500/60 flex items-center gap-4">
                       <div className="w-48 shrink-0">
-                        <CombatCard card={previewAiCard} />
+                        <CombatCard card={previewAiCard} lang={lang} />
                       </div>
                       <div className="space-y-2 flex-1">
                         <div className="font-display font-bold text-lg text-white">
-                          Forged Technique Ready!
+                          {localizeCard(previewAiCard, lang).name}
                         </div>
                         <p className="text-xs text-zinc-300">
-                          Standing rule validated: <strong>{previewAiCard.strikeZone}</strong> ({previewAiCard.discipline}) · STA {previewAiCard.staCost} · Power {previewAiCard.power} · SPD {previewAiCard.speed}
+                          {localizeCard(previewAiCard, lang).zoneLabel} ({localizeCard(previewAiCard, lang).disciplineLabel}) · {t.badgeSta} {previewAiCard.staCost} · {previewAiCard.power} · {t.badgeSpd} {previewAiCard.speed}
                         </p>
                         <div className="flex items-center gap-2 pt-1">
                           <button
@@ -699,7 +727,7 @@ export const FighterHub: React.FC<FighterHubProps> = ({
                             onClick={handleSaveAiCardToLibrary}
                             className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-display font-bold text-sm cursor-pointer"
                           >
-                            ADD TO MY LIBRARY
+                            {t.addToLibrary}
                           </button>
                           <button
                             type="button"
@@ -786,7 +814,7 @@ export const FighterHub: React.FC<FighterHubProps> = ({
                             : 'bg-[#101217] text-zinc-300 border-zinc-700'
                         }`}
                       >
-                        {d.id}
+                        {lang === 'my' ? DISCIPLINE_MY[d.id] : d.id}
                       </button>
                     ))}
                   </div>
@@ -797,11 +825,11 @@ export const FighterHub: React.FC<FighterHubProps> = ({
                       const canAfford = fighter.trainingXp >= card.unlockCostXp;
                       return (
                         <div key={card.id} className="flex flex-col gap-1.5">
-                          <CombatCard card={card} />
+                          <CombatCard card={card} lang={lang} />
                           {unlocked ? (
                             <div className="flex items-center justify-center gap-1 py-1.5 rounded bg-emerald-950/60 border border-emerald-700 text-emerald-300 text-[11px] font-bold uppercase">
                               <CheckCircle2 className="w-3.5 h-3.5" aria-hidden="true" />
-                              <span>Unlocked</span>
+                              <span>{t.learnedUnlocked}</span>
                             </div>
                           ) : (
                             <button
@@ -810,7 +838,7 @@ export const FighterHub: React.FC<FighterHubProps> = ({
                               onClick={() => handleUnlockCard(card.id, card.unlockCostXp)}
                               className="py-1.5 px-2 rounded bg-amber-500 hover:bg-amber-400 disabled:bg-zinc-800 disabled:text-zinc-500 text-black font-bold text-[11px] uppercase cursor-pointer"
                             >
-                              Learn · {card.unlockCostXp} XP
+                              {t.learnXp} · {card.unlockCostXp} XP
                             </button>
                           )}
                         </div>
@@ -828,7 +856,7 @@ export const FighterHub: React.FC<FighterHubProps> = ({
                   <div className="flex items-center justify-between gap-3 mb-3">
                     <div>
                       <h2 className="font-display font-extrabold text-xl text-white flex items-center gap-2">
-                        <span>ACTIVE FIGHT DECK</span>
+                        <span>{t.activeFightDeck}</span>
                         <span
                           className={`font-mono-num text-base ${
                             fighter.activeDeckIds.length === DECK_SIZE
@@ -840,7 +868,7 @@ export const FighterHub: React.FC<FighterHubProps> = ({
                         </span>
                       </h2>
                       <p className="text-[11px] text-zinc-400">
-                        Avg STA: <span className="font-mono-num text-sky-300">{deckAvgSta}</span> · Avg SPD:{' '}
+                        Avg {t.badgeSta}: <span className="font-mono-num text-sky-300">{deckAvgSta}</span> · Avg {t.badgeSpd}:{' '}
                         <span className="font-mono-num text-emerald-300">{deckAvgSpd}</span>
                       </p>
                     </div>
@@ -850,7 +878,7 @@ export const FighterHub: React.FC<FighterHubProps> = ({
                       className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#101217] hover:bg-zinc-800 border border-zinc-700 text-xs font-semibold text-zinc-200 cursor-pointer"
                     >
                       <RotateCcw className="w-3.5 h-3.5" aria-hidden="true" />
-                      <span>Auto-Fill Balanced</span>
+                      <span>{t.autoFillBalanced}</span>
                     </button>
                   </div>
 
@@ -860,7 +888,7 @@ export const FighterHub: React.FC<FighterHubProps> = ({
                       if (!card) return null;
                       return (
                         <div key={`${cardId}_${idx}`}>
-                          <CombatCard card={card} compact />
+                          <CombatCard card={card} compact lang={lang} />
                           <button
                             type="button"
                             onClick={() => handleRemoveCardFromDeck(idx)}
@@ -868,7 +896,7 @@ export const FighterHub: React.FC<FighterHubProps> = ({
                             className="mt-1 w-full flex items-center justify-center gap-1 py-1 rounded bg-zinc-900 hover:bg-red-900/80 border border-zinc-700 text-[10px] font-semibold text-zinc-300 hover:text-white cursor-pointer"
                           >
                             <Trash2 className="w-3 h-3" aria-hidden="true" />
-                            <span>Remove</span>
+                            <span>{t.remove}</span>
                           </button>
                         </div>
                       );
@@ -879,7 +907,7 @@ export const FighterHub: React.FC<FighterHubProps> = ({
                 <div className="bg-[#161920] rounded-xl comic-panel p-4">
                   <div className="flex items-center justify-between gap-3 mb-3">
                     <h3 className="font-display font-bold text-xl text-white">
-                      UNLOCKED TECHNIQUE LIBRARY
+                      {t.unlockedLibrary}
                     </h3>
                     <div className="flex items-center gap-1 p-1 bg-[#101217] rounded-lg border border-zinc-800">
                       {(['All', 'Striking', 'Defense', 'Critical'] as const).map((cat) => (
@@ -893,7 +921,7 @@ export const FighterHub: React.FC<FighterHubProps> = ({
                               : 'text-zinc-400 hover:text-white'
                           }`}
                         >
-                          {cat}
+                          {cat === 'All' ? t.allFilter : lang === 'my' ? CATEGORY_MY[cat] : cat}
                         </button>
                       ))}
                     </div>
@@ -905,7 +933,7 @@ export const FighterHub: React.FC<FighterHubProps> = ({
                       const isCritical = card.category === 'Critical';
                       return (
                         <div key={card.id} className="flex flex-col gap-1.5">
-                          <CombatCard card={card} />
+                          <CombatCard card={card} lang={lang} />
                           {isCritical ? (
                             <div className="py-1.5 px-2 rounded bg-amber-950/40 border border-amber-700/60 text-amber-300 text-[11px] font-bold text-center flex items-center justify-center gap-1">
                               <Award className="w-3.5 h-3.5" aria-hidden="true" />
@@ -921,7 +949,7 @@ export const FighterHub: React.FC<FighterHubProps> = ({
                               className="flex items-center justify-center gap-1 py-1.5 px-2 rounded bg-zinc-800 hover:bg-red-600 disabled:opacity-40 text-white text-[11px] font-bold uppercase cursor-pointer"
                             >
                               <Plus className="w-3.5 h-3.5" aria-hidden="true" />
-                              <span>Add ({copiesInDeck}/3)</span>
+                              <span>+ ({copiesInDeck}/3)</span>
                             </button>
                           )}
                         </div>

@@ -5,10 +5,12 @@ interface FighterAvatarProps {
   appearance: FighterAppearance;
   gender: Gender;
   pose?: FighterPose;
+  isRhythm?: boolean;
   facing?: 'right' | 'left';
   mode?: 'portrait' | 'fullbody';
   hasCut?: boolean;
   isChampion?: boolean;
+  animKey?: string | number;
   className?: string;
 }
 
@@ -22,27 +24,227 @@ function darkenHex(hex: string, amount = 0.22): string {
   return `rgb(${r}, ${g}, ${b})`;
 }
 
+function lightenHex(hex: string, amount = 0.14): string {
+  const clean = hex.replace('#', '');
+  const num = parseInt(clean, 16);
+  if (Number.isNaN(num)) return '#e2b48d';
+  const r = Math.min(255, Math.floor(((num >> 16) & 255) + (255 - ((num >> 16) & 255)) * amount));
+  const g = Math.min(255, Math.floor(((num >> 8) & 255) + (255 - ((num >> 8) & 255)) * amount));
+  const b = Math.min(255, Math.floor((num & 255) + (255 - (num & 255)) * amount));
+  return `rgb(${r}, ${g}, ${b})`;
+}
+
+interface JointClasses {
+  body: string;
+  head: string;
+  frontArm: string;
+  frontFore: string;
+  backArm: string;
+  backFore: string;
+  frontLeg: string;
+  frontShin: string;
+  backLeg: string;
+  backShin: string;
+}
+
+function getJointClasses(
+  pose: FighterPose,
+  isRhythm: boolean,
+  facing: 'right' | 'left'
+): JointClasses {
+  const empty: JointClasses = {
+    body: '',
+    head: '',
+    frontArm: '',
+    frontFore: '',
+    backArm: '',
+    backFore: '',
+    frontLeg: '',
+    frontShin: '',
+    backLeg: '',
+    backShin: '',
+  };
+
+  if (pose === 'idle') {
+    if (!isRhythm) return empty;
+    return {
+      body: facing === 'left' ? 'anim-rhythm-body-alt' : 'anim-rhythm-body',
+      head: 'anim-rhythm-head',
+      frontArm: 'anim-rhythm-arm-lead',
+      frontFore: 'anim-rhythm-fore-lead',
+      backArm: 'anim-rhythm-arm-rear',
+      backFore: 'anim-rhythm-fore-lead',
+      frontLeg: 'anim-rhythm-leg-front',
+      frontShin: 'anim-rhythm-shin-front',
+      backLeg: 'anim-rhythm-leg-back',
+      backShin: '',
+    };
+  }
+
+  switch (pose) {
+    case 'jab':
+      return {
+        ...empty,
+        body: 'anim-body-jab',
+        frontArm: 'anim-arm-jab-lead',
+        frontFore: 'anim-fore-jab-lead',
+        frontLeg: 'anim-leg-lunge',
+        frontShin: 'anim-shin-lunge',
+        backLeg: 'anim-leg-drive',
+      };
+    case 'hook':
+      return {
+        ...empty,
+        body: 'anim-body-hook',
+        backArm: 'anim-arm-hook-rear',
+        backFore: 'anim-fore-hook-rear',
+        frontLeg: 'anim-leg-lunge',
+        frontShin: 'anim-shin-lunge',
+        backLeg: 'anim-leg-drive',
+      };
+    case 'elbow':
+      return {
+        ...empty,
+        body: 'anim-body-elbow',
+        frontArm: 'anim-arm-elbow-lead',
+        frontFore: 'anim-fore-elbow-lead',
+        frontLeg: 'anim-leg-lunge',
+        frontShin: 'anim-shin-lunge',
+        backLeg: 'anim-leg-drive',
+      };
+    case 'headbutt':
+      return {
+        ...empty,
+        body: 'anim-body-headbutt',
+        head: 'anim-head-butt',
+        frontArm: 'anim-arm-block',
+        backArm: 'anim-arm-block',
+        frontLeg: 'anim-leg-lunge',
+        frontShin: 'anim-shin-lunge',
+        backLeg: 'anim-leg-drive',
+      };
+    case 'kick':
+      return {
+        ...empty,
+        body: 'anim-body-kick',
+        head: 'anim-head-balance',
+        frontArm: 'anim-arm-block',
+        backArm: 'anim-arm-hit',
+        frontLeg: 'anim-leg-kick',
+        frontShin: 'anim-shin-kick',
+        backLeg: 'anim-leg-drive',
+      };
+    case 'knee':
+      return {
+        ...empty,
+        body: 'anim-body-knee',
+        frontArm: 'anim-arm-jab-lead',
+        backArm: 'anim-arm-block',
+        frontLeg: 'anim-leg-knee',
+        frontShin: 'anim-shin-knee',
+      };
+    case 'slam':
+      return {
+        ...empty,
+        body: 'anim-body-headbutt',
+        frontArm: 'anim-arm-jab-lead',
+        frontFore: 'anim-fore-jab-lead',
+        backArm: 'anim-arm-hook-rear',
+        backFore: 'anim-fore-hook-rear',
+        frontLeg: 'anim-leg-lunge',
+        frontShin: 'anim-shin-lunge',
+        backLeg: 'anim-leg-drive',
+      };
+    case 'block':
+    case 'catchkick':
+      return {
+        ...empty,
+        body: 'anim-body-block',
+        head: 'anim-head-tuck',
+        frontArm: 'anim-arm-block',
+        frontFore: 'anim-fore-block',
+        backArm: 'anim-arm-block',
+        backFore: 'anim-fore-block',
+        frontLeg: 'anim-leg-lunge',
+        backLeg: 'anim-leg-drive',
+      };
+    case 'parry':
+      return {
+        ...empty,
+        body: 'anim-body-block',
+        head: 'anim-head-tuck',
+        frontArm: 'anim-arm-jab-lead',
+        frontFore: 'anim-fore-jab-lead',
+        backArm: 'anim-arm-block',
+        backFore: 'anim-fore-block',
+        frontLeg: 'anim-leg-lunge',
+      };
+    case 'evade':
+      return {
+        ...empty,
+        body: 'anim-body-evade',
+        head: 'anim-head-evade',
+        frontArm: 'anim-arm-block',
+        backArm: 'anim-arm-block',
+        frontLeg: 'anim-leg-bend',
+        frontShin: 'anim-shin-bend',
+        backLeg: 'anim-leg-bend',
+        backShin: 'anim-shin-bend',
+      };
+    case 'hit':
+      return {
+        ...empty,
+        body: 'anim-body-hit',
+        head: 'anim-head-hit',
+        frontArm: 'anim-arm-hit',
+        backArm: 'anim-arm-hit',
+        frontLeg: 'anim-leg-bend',
+      };
+    case 'ko':
+      return {
+        ...empty,
+        body: 'anim-body-ko',
+        head: 'anim-head-hit',
+        frontArm: 'anim-arm-hit',
+        backArm: 'anim-arm-hit',
+      };
+    case 'victory':
+      return {
+        ...empty,
+        body: 'anim-rhythm-body',
+      };
+    default:
+      return empty;
+  }
+}
+
 export const FighterAvatar: React.FC<FighterAvatarProps> = ({
   appearance,
   gender,
   pose = 'idle',
+  isRhythm = false,
   facing = 'right',
   mode = 'portrait',
   hasCut = false,
   isChampion = false,
+  animKey,
   className = '',
 }) => {
   const skin = appearance.skinTone;
-  const skinShadow = darkenHex(skin, 0.22);
+  const skinShadow = darkenHex(skin, 0.24);
+  const skinHighlight = lightenHex(skin, 0.16);
   const hair = appearance.hairColor;
   const shorts = appearance.shortsColor;
-  const shortsShadow = darkenHex(shorts, 0.28);
+  const shortsShadow = darkenHex(shorts, 0.34);
   const wrap = appearance.wrapColor;
+  const wrapShadow = darkenHex(wrap, 0.22);
+  const sashColor = facing === 'left' ? '#1d4ed8' : '#dc2626';
+  const sashShadow = darkenHex(sashColor, 0.28);
 
   const torsoScaleX =
     appearance.build === 'Heavy' ? 1.15 : appearance.build === 'Lean' ? 0.9 : 1.02;
-  const shoulderW = (gender === 'Male' ? 34 : 28) * torsoScaleX;
-  const waistW = (gender === 'Male' ? 23 : 19) * torsoScaleX;
+  const shoulderW = (gender === 'Male' ? 32 : 26) * torsoScaleX;
+  const waistW = (gender === 'Male' ? 21 : 17) * torsoScaleX;
 
   const renderPortraitHair = () => {
     switch (appearance.hairstyle) {
@@ -189,253 +391,400 @@ export const FighterAvatar: React.FC<FighterAvatarProps> = ({
     );
   }
 
-  // ================= FULLBODY COMIC RING FIGHTER (Joint-Anchored Anatomy) =================
-  const heightScale = 0.92 + ((appearance.heightCm - 165) / 30) * 0.14;
-  const frontShoulderX = 100 + shoulderW - 4;
-  const frontShoulderY = 82;
-  const backShoulderX = 100 - shoulderW + 4;
-  const backShoulderY = 82;
+  // ================= FULLBODY ARTICULATED COMIC FIGHTER (Reference Sheet Style) =================
+  const heightScale = 0.94 + ((appearance.heightCm - 165) / 30) * 0.12;
+  const joints = getJointClasses(pose, isRhythm, facing);
+  const activeKey = pose === 'idle' ? 'idle' : String(animKey ?? pose);
 
-  let bodyTransform = '';
-  let headAngle = 0;
-  let frontArmAngle = 0;
-  let frontArmStretch = 0;
-  let backArmAngle = 0;
-  let backArmStretch = 0;
-  let frontLegAngle = 0;
-  let backLegAngle = 0;
+  // Relative to pelvis pivot (108, 150)
+  const backShoulderX = -shoulderW * 0.56;
+  const frontShoulderX = shoulderW * 0.62;
+  const shoulderY = -62;
 
-  switch (pose) {
-    case 'jab':
-      bodyTransform = 'translate(18, 0) rotate(6 100 135)';
-      frontArmAngle = -88;
-      frontArmStretch = 22;
-      break;
-    case 'hook':
-      bodyTransform = 'translate(22, 2) rotate(10 100 135)';
-      backArmAngle = -72;
-      backArmStretch = 16;
-      break;
-    case 'elbow':
-      bodyTransform = 'translate(22, -2) rotate(13 100 135)';
-      frontArmAngle = -112;
-      frontArmStretch = 6;
-      break;
-    case 'headbutt':
-      bodyTransform = 'translate(28, 6) rotate(22 100 135)';
-      headAngle = 14;
-      frontArmAngle = 24;
-      backArmAngle = 22;
-      break;
-    case 'kick':
-      bodyTransform = 'translate(14, -6) rotate(-14 100 135)';
-      frontLegAngle = -78;
-      frontArmAngle = 18;
-      break;
-    case 'knee':
-      bodyTransform = 'translate(22, -10) rotate(8 100 135)';
-      frontLegAngle = -48;
-      frontArmAngle = -35;
-      backArmAngle = -30;
-      break;
-    case 'slam':
-      bodyTransform = 'translate(28, 12) rotate(24 100 135)';
-      frontArmAngle = -30;
-      frontArmStretch = 14;
-      backArmAngle = -28;
-      backArmStretch = 12;
-      break;
-    case 'block':
-      bodyTransform = 'translate(-4, 4)';
-      frontArmAngle = -42;
-      backArmAngle = -36;
-      break;
-    case 'evade':
-      bodyTransform = 'translate(-20, 12) rotate(-18 100 145)';
-      break;
-    case 'hit':
-      bodyTransform = 'translate(-16, 4) rotate(-14 100 135)';
-      headAngle = -16;
-      break;
-    case 'ko':
-      bodyTransform = 'translate(-22, 74) rotate(-78 100 165)';
-      break;
-    case 'victory':
-      frontArmAngle = -135;
-      frontArmStretch = 10;
-      backArmAngle = -130;
-      backArmStretch = 10;
-      break;
-    case 'idle':
-    default:
-      break;
-  }
+  const isVictory = pose === 'victory';
 
   return (
-    <svg viewBox="0 0 220 260" className={`select-none overflow-visible ${className}`} aria-hidden="true">
+    <svg viewBox="0 0 240 260" className={`select-none overflow-visible ${className}`} aria-hidden="true">
       <g
         transform={`${
-          facing === 'left' ? 'translate(220, 0) scale(-1, 1) ' : ''
+          facing === 'left' ? 'translate(240, 0) scale(-1, 1) ' : ''
         }translate(0, ${250 * (1 - heightScale)}) scale(1, ${heightScale})`}
       >
-        {/* Ground contact shadow */}
-        <ellipse cx="104" cy="244" rx="50" ry="10" fill="#090a0c" opacity="0.45" />
+        {/* Crisp Dark Cast Shadow on Mat (Image 1 Style) */}
+        <ellipse cx="108" cy="245" rx="64" ry="11" fill="#06070a" opacity="0.68" />
+        <polygon points="74,244 138,244 14,262 -18,258" fill="#06070a" opacity="0.34" />
 
-        <g transform={bodyTransform}>
-          {/* Back Leg (anchored at hip 88, 154) */}
-          <g transform={`rotate(${backLegAngle}, 88, 154)`}>
-            <path
-              d="M 80 152 C 74 176, 70 194, 66 206 L 58 238 L 76 238 L 86 204 L 98 160 Z"
-              fill={skinShadow}
-              stroke="#090a0c"
-              strokeWidth="3.2"
-              strokeLinejoin="round"
-            />
-            <rect x="60" y="218" width="17" height="14" rx="3" fill={wrap} stroke="#090a0c" strokeWidth="2.2" />
-          </g>
+        {/* Pelvis / Center of Mass Anchor (108, 150) */}
+        <g transform="translate(108, 150)">
+          <g key={activeKey} className={joints.body} style={{ transformOrigin: '0px 0px' }}>
+            {/* 1. BACK LEG (Wide Orthodox Stance, Anchored at Hip (-14, 6)) */}
+            <g transform="translate(-14, 6)">
+              <g className={joints.backLeg} style={{ transformOrigin: '0px 0px' }}>
+                {/* Rear Thigh (Open-bottom ink outline so knee blends seamlessly) */}
+                <path
+                  d="M -12 -6 C -19 14, -24 28, -26 42 L -11 43 C -4 28, 2 14, 6 -4 Z"
+                  fill={skinShadow}
+                />
+                <path
+                  d="M -12 -6 C -19 14, -24 28, -26 42 M 6 -4 C 2 14, -4 28, -11 43"
+                  fill="none"
+                  stroke="#090a0c"
+                  strokeWidth="2.8"
+                  strokeLinecap="round"
+                />
 
-          {/* Back Arm (anchored at backShoulderX, backShoulderY) */}
-          <g transform={`rotate(${backArmAngle}, ${backShoulderX}, ${backShoulderY})`}>
-            <circle cx={backShoulderX} cy={backShoulderY} r="10" fill={skinShadow} stroke="#090a0c" strokeWidth="3" />
+                {/* Back Knee Pivot (-18, 42) */}
+                <g transform="translate(-18, 42)">
+                  <g className={joints.backShin} style={{ transformOrigin: '0px 0px' }}>
+                    {/* Seamless Knee Blend Fill */}
+                    <circle cx="0" cy="0" r="7.5" fill={skinShadow} />
+                    {/* Calf & Shin */}
+                    <path
+                      d="M -8 -2 C -15 14, -15 28, -12 42 L 0 42 C 4 28, 7 14, 7 -1 Z"
+                      fill={skinShadow}
+                    />
+                    <path
+                      d="M -8 -2 C -15 14, -15 28, -12 42 M 7 -1 C 7 14, 4 28, 0 42"
+                      fill="none"
+                      stroke="#090a0c"
+                      strokeWidth="2.8"
+                      strokeLinecap="round"
+                    />
+                    <path d="M -5 5 Q -2 10 2 8" fill="none" stroke="#090a0c" strokeWidth="1.6" strokeLinecap="round" opacity="0.65" />
+                    {/* Ankle Wrap */}
+                    <rect x="-13" y="29" width="14" height="10" rx="2" fill={wrapShadow} stroke="#090a0c" strokeWidth="2.1" />
+                    {/* Bare Rear Foot */}
+                    <path
+                      d="M -13 40 L -16 46 L 8 46 C 9 42, 3 40, -1 40 Z"
+                      fill={skinShadow}
+                      stroke="#090a0c"
+                      strokeWidth="2.6"
+                      strokeLinejoin="round"
+                    />
+                  </g>
+                </g>
+              </g>
+            </g>
+
+            {/* 2. BACK ARM (Rear Guard Hand Held Near Jaw, Anchored at Back Shoulder) */}
+            <g transform={`translate(${backShoulderX}, ${shoulderY})`}>
+              <g
+                transform={isVictory ? 'rotate(-122)' : undefined}
+                className={joints.backArm}
+                style={{ transformOrigin: '0px 0px' }}
+              >
+                {/* Rear Upper Arm */}
+                <path
+                  d="M -6 -6 C -9 6, -3 18, 6 24 L 15 18 C 12 8, 9 0, 5 -6 Z"
+                  fill={skinShadow}
+                />
+                <path
+                  d="M -6 -6 C -9 6, -3 18, 6 24 M 15 18 C 12 8, 9 0, 5 -6"
+                  fill="none"
+                  stroke="#090a0c"
+                  strokeWidth="2.6"
+                  strokeLinecap="round"
+                />
+
+                {/* Back Elbow Pivot (10, 20) */}
+                <g transform="translate(10, 20)">
+                  <g className={joints.backFore} style={{ transformOrigin: '0px 0px' }}>
+                    <circle cx="0" cy="0" r="5" fill={skinShadow} />
+                    <path
+                      d="M -5 1 L 24 -22 L 32 -14 L 4 7 Z"
+                      fill={skinShadow}
+                    />
+                    <path
+                      d="M -5 1 L 24 -22 M 4 7 L 32 -14"
+                      fill="none"
+                      stroke="#090a0c"
+                      strokeWidth="2.6"
+                      strokeLinecap="round"
+                    />
+                    {/* Wrapped Rear Fist (Visible guarding jaw/cheek) */}
+                    <g transform="translate(26, -26) rotate(-22)">
+                      <rect x="0" y="0" width="19" height="15.5" rx="5" fill={wrapShadow} stroke="#090a0c" strokeWidth="2.4" />
+                      <path d="M 3 5 L 16 5 M 3 10.5 L 16 10.5" stroke="#090a0c" strokeWidth="1.4" opacity="0.65" />
+                    </g>
+                  </g>
+                </g>
+              </g>
+            </g>
+
+            {/* 3. FRONT LEG (Athletic Bent Knee Forward, Anchored at Hip (11, 8)) */}
+            <g transform="translate(11, 8)">
+              <g className={joints.frontLeg} style={{ transformOrigin: '0px 0px' }}>
+                {/* Muscular Lead Thigh (Seamless open bottom edge) */}
+                <path
+                  d="M -9 -6 C -2 12, 8 28, 17 42 L 30 38 C 25 20, 18 4, 11 -7 Z"
+                  fill={skin}
+                />
+                <path
+                  d="M -9 -6 C -2 12, 8 28, 17 42 M 11 -7 C 18 4, 25 20, 30 38"
+                  fill="none"
+                  stroke="#090a0c"
+                  strokeWidth="2.8"
+                  strokeLinecap="round"
+                />
+                {/* Thigh Shading & Traditional Ink Marking */}
+                <path d="M 11 10 Q 17 20 21 31" fill="none" stroke="#090a0c" strokeWidth="1.5" opacity="0.45" />
+                <path d="M 8 18 L 15 16 M 10 23 L 17 21" stroke="#090a0c" strokeWidth="1.2" opacity="0.35" />
+
+                {/* Front Knee Pivot (23, 39) */}
+                <g transform="translate(23, 39)">
+                  <g className={joints.frontShin} style={{ transformOrigin: '0px 0px' }}>
+                    {/* Seamless Knee Blend Fill */}
+                    <circle cx="0" cy="0" r="7.5" fill={skin} />
+                    {/* Sculpted Calf & Shin */}
+                    <path
+                      d="M -7 -1 C -9 14, -6 28, -3 41 L 8 41 C 10 27, 9 13, 6 -2 Z"
+                      fill={skin}
+                    />
+                    <path
+                      d="M -7 -1 C -9 14, -6 28, -3 41 M 6 -2 C 9 13, 10 27, 8 41"
+                      fill="none"
+                      stroke="#090a0c"
+                      strokeWidth="2.8"
+                      strokeLinecap="round"
+                    />
+                    <path d="M -2 3 Q 2 7 4 4" fill="none" stroke="#090a0c" strokeWidth="1.7" strokeLinecap="round" opacity="0.6" />
+                    <path d="M -2 14 Q -3 24 0 32" fill="none" stroke="#090a0c" strokeWidth="1.5" opacity="0.45" />
+                    {/* Front Ankle Wrap */}
+                    <rect x="-4" y="29" width="13.5" height="10" rx="2" fill={wrap} stroke="#090a0c" strokeWidth="2.1" />
+                    {/* Bare Lead Foot */}
+                    <path
+                      d="M -4 40 L -5 47 L 19 47 C 20 43, 13 40, 7 40 Z"
+                      fill={skin}
+                      stroke="#090a0c"
+                      strokeWidth="2.6"
+                      strokeLinejoin="round"
+                    />
+                  </g>
+                </g>
+              </g>
+            </g>
+
+            {/* 4. LETHWEI SHORTS & TRADITIONAL SASH (Anchored around Pelvis (0,0)) */}
             <path
-              d={`M ${backShoulderX - 6} ${backShoulderY + 4} L ${backShoulderX - 10} ${backShoulderY + 26} L ${backShoulderX + 18 + backArmStretch} ${backShoulderY + 20} L ${backShoulderX + 20 + backArmStretch} ${backShoulderY + 6} L ${backShoulderX + 4} ${backShoulderY + 12} Z`}
-              fill={skinShadow}
+              d={`M ${-waistW - 1} -18 L ${waistW + 2} -18 L ${waistW + 13} 22 L 5 19 L 0 13 L -5 19 L ${-waistW - 12} 22 Z`}
+              fill={shorts}
               stroke="#090a0c"
               strokeWidth="3"
               strokeLinejoin="round"
             />
+            {/* Comic Folds on Shorts */}
+            <path d={`M ${-waistW - 5} 14 L -6 12 M 6 12 L ${waistW + 6} 14`} stroke={shortsShadow} strokeWidth="2.8" strokeLinecap="round" />
+            <path d={`M ${waistW + 3} -10 L ${waistW + 10} 16`} stroke="#ffffff" strokeWidth="1.5" opacity="0.22" />
+            {/* Traditional Waist Sash & Hanging Cloth Ties */}
             <rect
-              x={backShoulderX + 14 + backArmStretch}
-              y={backShoulderY + 2}
-              width="21"
-              height="18"
-              rx="6"
-              fill={wrap}
+              x={-waistW - 2}
+              y="-22"
+              width={waistW * 2 + 5}
+              height="10"
+              rx="3"
+              fill={sashColor}
               stroke="#090a0c"
-              strokeWidth="2.6"
+              strokeWidth="2.4"
             />
-          </g>
-
-          {/* Front Leg (anchored at hip 114, 154) */}
-          <g transform={`rotate(${frontLegAngle}, 114, 154)`}>
             <path
-              d="M 104 152 L 122 198 L 128 240 L 146 240 L 140 198 C 136 178, 130 162, 122 152 Z"
-              fill={skin}
+              d={`M ${-waistW + 4} -12 L ${-waistW - 9} 8 L ${-waistW} 8 Z M ${-waistW + 9} -12 L ${-waistW + 1} 11 L ${-waistW + 10} 9 Z`}
+              fill={sashColor}
               stroke="#090a0c"
-              strokeWidth="3.2"
+              strokeWidth="2"
               strokeLinejoin="round"
             />
-            <rect x="125" y="219" width="17" height="14" rx="3" fill={wrap} stroke="#090a0c" strokeWidth="2.2" />
-          </g>
+            <rect x={-waistW + 2} y="-22" width="7" height="10" rx="2" fill={sashShadow} stroke="#090a0c" strokeWidth="1.8" />
 
-          {/* Lethwei Shorts & Traditional Waist Sash (Image 1 Style) */}
-          <path
-            d={`M ${100 - waistW} 130 L ${100 + waistW} 130 L ${100 + waistW + 12} 170 L 103 166 L 97 166 L ${100 - waistW - 10} 170 Z`}
-            fill={shorts}
-            stroke="#090a0c"
-            strokeWidth="3.2"
-            strokeLinejoin="round"
-          />
-          {/* Traditional Red/Blue Waist Sash + Hanging Ties */}
-          <rect
-            x={100 - waistW - 1}
-            y="126"
-            width={waistW * 2 + 2}
-            height="12"
-            rx="3"
-            fill={facing === 'left' ? '#1d4ed8' : '#dc2626'}
-            stroke="#090a0c"
-            strokeWidth="2.5"
-          />
-          <path
-            d={`M ${100 - waistW + 4} 138 L ${100 - waistW - 6} 158 L ${100 - waistW + 4} 156 Z`}
-            fill={facing === 'left' ? '#1d4ed8' : '#dc2626'}
-            stroke="#090a0c"
-            strokeWidth="2.2"
-            strokeLinejoin="round"
-          />
-          <path d={`M ${100 - waistW - 4} 162 L ${100 - 4} 160`} stroke={shortsShadow} strokeWidth="3" />
-
-          {/* Muscular Curved Torso with Traps */}
-          <path
-            d={`M 88 68 Q ${100 - shoulderW} 72 ${100 - shoulderW - 4} 84 L ${100 - waistW} 130 L ${100 + waistW} 130 L ${100 + shoulderW + 4} 84 Q ${100 + shoulderW} 72 112 68 Z`}
-            fill={skin}
-            stroke="#090a0c"
-            strokeWidth="3.4"
-            strokeLinejoin="round"
-          />
-          <path
-            d={`M ${100 - shoulderW + 8} 94 Q 100 102 ${100 + shoulderW - 8} 94`}
-            fill="none"
-            stroke="#090a0c"
-            strokeWidth="2.4"
-            strokeLinecap="round"
-          />
-          <path d="M 100 84 L 100 122" stroke="#090a0c" strokeWidth="2" opacity="0.65" />
-
-          {/* Head */}
-          <g transform={`rotate(${headAngle}, 100, 62)`}>
-            <rect x="92" y="58" width="16" height="16" fill={skinShadow} stroke="#090a0c" strokeWidth="2.8" />
+            {/* 5. SCULPTED COMIC TORSO (Anchored above Waist) */}
             <path
-              d="M 83 34 C 83 18, 117 18, 117 34 L 117 52 C 117 65, 108 71, 100 71 C 92 71, 83 65, 83 52 Z"
+              d={`M -11 -78 Q ${-shoulderW * 0.85} -75 ${-shoulderW} -60 L ${-waistW} -20 L ${waistW} -20 L ${shoulderW} -60 Q ${shoulderW * 0.85} -75 11 -78 Z`}
               fill={skin}
               stroke="#090a0c"
-              strokeWidth="3.2"
+              strokeWidth="3"
+              strokeLinejoin="round"
             />
-            {appearance.hairstyle !== 'Shaved' && (
+            {/* Comic Torso Shadow & Chest Highlight */}
+            <path
+              d={`M -11 -76 Q ${-shoulderW * 0.8} -73 ${-shoulderW + 2} -60 L ${-waistW + 2} -21 L -3 -21 L -4 -66 Z`}
+              fill={skinShadow}
+              opacity="0.45"
+            />
+            <path
+              d={`M 3 -64 Q ${shoulderW * 0.6} -64 ${shoulderW - 6} -56 Q ${shoulderW * 0.55} -46 3 -48 Z`}
+              fill={skinHighlight}
+              opacity="0.35"
+            />
+            {/* Pectorals, Collarbone & Ab Linework */}
+            <path
+              d={`M ${-shoulderW + 8} -54 Q -4 -47 2 -52 Q ${shoulderW * 0.65} -48 ${shoulderW - 7} -55`}
+              fill="none"
+              stroke="#090a0c"
+              strokeWidth="2.2"
+              strokeLinecap="round"
+            />
+            <path d="M 1 -62 L 1 -24" stroke="#090a0c" strokeWidth="1.8" opacity="0.6" />
+            <path d="M -7 -42 Q 1 -40 9 -42 M -6 -33 Q 1 -31 8 -33" fill="none" stroke="#090a0c" strokeWidth="1.6" opacity="0.55" />
+            {/* Traditional Lethwei Chest & Abdomen Sak Yant Ink Motifs */}
+            <g stroke="#090a0c" strokeWidth="1.1" opacity="0.36" fill="none">
+              <path d="M -9 -59 L 11 -59 M -7 -56 L 9 -56" />
+              <circle cx="1" cy="-37" r="6" strokeDasharray="2 2" />
+            </g>
+
+            {/* 6. HEAD & NECK (Anchored at Neck Base (2, -76)) */}
+            <g transform="translate(2, -76)">
+              <g className={joints.head} style={{ transformOrigin: '0px 0px' }}>
+                {/* Muscular Neck (Blends cleanly behind jawline) */}
+                <path d="M -9 4 L -7 -13 L 8 -13 L 10 4 Z" fill={skinShadow} stroke="#090a0c" strokeWidth="2.6" />
+                {/* 3/4 Profile Head & Strong Jawline */}
+                <path
+                  d="M -15 -34 C -15 -49, 17 -49, 18 -34 L 18 -19 C 18 -7, 10 -2, 2 -2 C -7 -2, -15 -8, -15 -20 Z"
+                  fill={skin}
+                  stroke="#090a0c"
+                  strokeWidth="3"
+                  strokeLinejoin="round"
+                />
+                {/* Cheekbone Shadow & Ear */}
+                <path d="M -13 -22 L -13 -12 C -10 -6, -4 -3, 1 -3 L -4 -20 Z" fill={skinShadow} opacity="0.55" />
+                <ellipse cx="-14" cy="-21" rx="3.4" ry="5.5" fill={skinShadow} stroke="#090a0c" strokeWidth="2.2" />
+
+                {/* Hairstyle */}
+                {appearance.hairstyle !== 'Shaved' && (
+                  <path
+                    d={
+                      appearance.hairstyle === 'Mohawk'
+                        ? 'M -6 -36 L -8 -55 L 5 -52 L 5 -36 Z'
+                        : appearance.hairstyle === 'Topknot'
+                        ? 'M -15 -34 C -15 -47, 17 -47, 17 -34 L 7 -38 L 4 -52 L -4 -51 L -4 -38 Z'
+                        : appearance.hairstyle === 'LongTied'
+                        ? 'M -15 -34 C -15 -47, 18 -47, 18 -34 C 8 -39, -5 -39, -15 -34 M -15 -34 C -22 -27, -23 -14, -17 -10 Z'
+                        : 'M -15 -33 C -15 -48, 18 -48, 18 -33 C 9 -38, -5 -38, -15 -33 Z'
+                    }
+                    fill={hair}
+                    stroke="#090a0c"
+                    strokeWidth="2.4"
+                    strokeLinejoin="round"
+                  />
+                )}
+                {isChampion && (
+                  <rect x="-15" y="-36" width="33" height="4.5" fill="#eab308" stroke="#090a0c" strokeWidth="1.5" />
+                )}
+
+                {/* Focused Fighter Brow, Eye, Nose & Mouth */}
+                <path d="M 1 -28 L 14 -26" stroke="#090a0c" strokeWidth="2.6" strokeLinecap="round" />
+                <ellipse cx="9" cy="-22.5" rx="2.4" ry="1.8" fill="#090a0c" />
+                <path d="M 11 -22 L 13 -14 L 8 -13" fill="none" stroke="#090a0c" strokeWidth="2" strokeLinecap="round" />
+                <path d="M 4 -8.5 L 12 -9" stroke="#090a0c" strokeWidth="2.2" strokeLinecap="round" />
+
+                {hasCut && (
+                  <g>
+                    <path d="M 10 -31 L 15 -23" stroke="#dc2626" strokeWidth="2.6" strokeLinecap="round" />
+                    <path d="M 12 -23 L 12 -15" stroke="#b91c1c" strokeWidth="1.8" strokeLinecap="round" />
+                  </g>
+                )}
+              </g>
+            </g>
+
+            {/* 7. FRONT LEAD ARM (Seamless Shoulder & Elbow Transitions, Anchored at Front Shoulder) */}
+            <g transform={`translate(${frontShoulderX}, ${shoulderY})`}>
+              <g
+                transform={isVictory ? 'rotate(-128)' : undefined}
+                className={joints.frontArm}
+                style={{ transformOrigin: '0px 0px' }}
+              >
+                {/* Seamless Deltoid Cap & Bicep */}
+                <circle cx="0" cy="0" r="10.2" fill={skin} />
+                <path
+                  d="M -7 -5 C -10 2, -6 12, 6 26 L 18 20 C 16 10, 12 0, 7 -6 C 2 -11, -5 -9, -7 -5 Z"
+                  fill={skin}
+                />
+                <path
+                  d="M -7 -4 C -7 4, -2 15, 6 25 M 7 -6 C 12 0, 16 10, 18 20"
+                  fill="none"
+                  stroke="#090a0c"
+                  strokeWidth="2.8"
+                  strokeLinecap="round"
+                />
+                <path d="M -4 -7 Q 3 -11 8 -6" fill="none" stroke="#090a0c" strokeWidth="2.6" strokeLinecap="round" />
+                <path d="M 3 5 Q 7 13 11 19" fill="none" stroke="#090a0c" strokeWidth="1.5" opacity="0.45" />
+
+                {/* Front Elbow Pivot (13, 23) */}
+                <g transform="translate(13, 23)">
+                  <g className={joints.frontFore} style={{ transformOrigin: '0px 0px' }}>
+                    {/* Seamless Elbow Cap */}
+                    <circle cx="0" cy="0" r="6.4" fill={skin} />
+                    {/* Forearm anchored squarely on elbow pivot */}
+                    <path
+                      d="M -4 -3 L 20 -18 L 28 -11 L 4 6 Z"
+                      fill={skin}
+                    />
+                    <path
+                      d="M -4 -3 L 20 -18 M 4 6 L 28 -11"
+                      fill="none"
+                      stroke="#090a0c"
+                      strokeWidth="2.8"
+                      strokeLinecap="round"
+                    />
+                    <path d="M -5 1 Q -3 7 4 6" fill="none" stroke="#090a0c" strokeWidth="2.4" strokeLinecap="round" />
+                    {/* Bandaged Lethwei Lead Fist */}
+                    <g transform="translate(19, -24) rotate(-32)">
+                      <rect x="0" y="0" width="21" height="17" rx="5.5" fill={wrap} stroke="#090a0c" strokeWidth="2.6" />
+                      <path d="M 3 5.5 L 18 5.5 M 3 11 L 18 11" stroke="#090a0c" strokeWidth="1.5" opacity="0.55" />
+                      <rect x="3" y="13" width="11" height="5" rx="2.5" fill={wrap} stroke="#090a0c" strokeWidth="1.8" />
+                    </g>
+                  </g>
+                </g>
+              </g>
+            </g>
+
+            {/* 8. COMIC STRIKE / GUARD / IMPACT SPEED LINES */}
+            {(pose === 'jab' || pose === 'hook' || pose === 'elbow' || pose === 'headbutt' || pose === 'slam') && (
+              <g stroke="#fbbf24" strokeWidth="2.6" strokeLinecap="round" opacity="0.92">
+                <line x1="62" y1="-82" x2="108" y2="-86" />
+                <line x1="68" y1="-68" x2="118" y2="-68" />
+                <line x1="62" y1="-54" x2="104" y2="-48" />
+              </g>
+            )}
+            {(pose === 'kick' || pose === 'knee') && (
               <path
-                d={
-                  appearance.hairstyle === 'Mohawk'
-                    ? 'M 94 32 L 92 12 L 105 14 L 105 32 Z'
-                    : appearance.hairstyle === 'Topknot'
-                    ? 'M 83 34 C 83 20, 117 20, 117 34 L 106 30 L 102 15 L 94 16 L 94 30 Z'
-                    : 'M 83 35 C 83 19, 117 19, 117 35 C 107 30, 93 30, 83 35 Z'
-                }
-                fill={hair}
-                stroke="#090a0c"
-                strokeWidth="2.4"
+                d="M 42 -10 Q 94 -32 82 -82"
+                fill="none"
+                stroke="#f5f2eb"
+                strokeWidth="3.2"
+                strokeDasharray="7 4"
+                strokeLinecap="round"
+                opacity="0.9"
               />
             )}
-            {isChampion && (
-              <rect x="82" y="33" width="36" height="5" fill="#eab308" stroke="#090a0c" strokeWidth="1.5" />
+            {(pose === 'block' || pose === 'parry' || pose === 'catchkick') && (
+              <path
+                d="M 42 -84 Q 68 -52 44 -18"
+                fill="none"
+                stroke="#38bdf8"
+                strokeWidth="3.8"
+                strokeLinecap="round"
+                opacity="0.85"
+              />
             )}
-            <path d="M 96 42 L 112 44" stroke="#090a0c" strokeWidth="2.8" strokeLinecap="round" />
-            <circle cx="107" cy="48" r="2.2" fill="#090a0c" />
-            <path d="M 101 59 L 111 59" stroke="#090a0c" strokeWidth="2.2" strokeLinecap="round" />
-            {hasCut && (
-              <path d="M 108 38 L 114 48" stroke="#dc2626" strokeWidth="2.8" strokeLinecap="round" />
+            {pose === 'evade' && (
+              <path
+                d="M -32 -76 Q -56 -56 -38 -30"
+                fill="none"
+                stroke="#34d399"
+                strokeWidth="3"
+                strokeDasharray="5 3"
+                strokeLinecap="round"
+              />
             )}
-          </g>
-
-          {/* Front Lead Arm (anchored cleanly at frontShoulderX, frontShoulderY) */}
-          <g transform={`rotate(${frontArmAngle}, ${frontShoulderX}, ${frontShoulderY})`}>
-            <circle cx={frontShoulderX} cy={frontShoulderY} r="10.5" fill={skin} stroke="#090a0c" strokeWidth="3" />
-            <path
-              d={`M ${frontShoulderX - 5} ${frontShoulderY + 4} L ${frontShoulderX + 4} ${frontShoulderY + 26} L ${frontShoulderX + 26 + frontArmStretch} ${frontShoulderY + 18} L ${frontShoulderX + 24 + frontArmStretch} ${frontShoulderY + 4} L ${frontShoulderX + 6} ${frontShoulderY + 12} Z`}
-              fill={skin}
-              stroke="#090a0c"
-              strokeWidth="3"
-              strokeLinejoin="round"
-            />
-            <rect
-              x={frontShoulderX + 20 + frontArmStretch}
-              y={frontShoulderY - 1}
-              width="23"
-              height="19"
-              rx="6"
-              fill={wrap}
-              stroke="#090a0c"
-              strokeWidth="2.8"
-            />
-            <path
-              d={`M ${frontShoulderX + 24 + frontArmStretch} ${frontShoulderY + 5} L ${frontShoulderX + 39 + frontArmStretch} ${frontShoulderY + 5} M ${frontShoulderX + 24 + frontArmStretch} ${frontShoulderY + 12} L ${frontShoulderX + 39 + frontArmStretch} ${frontShoulderY + 12}`}
-              stroke="#090a0c"
-              strokeWidth="1.6"
-              opacity="0.55"
-            />
+            {pose === 'hit' && (
+              <g stroke="#ef4444" strokeWidth="3" strokeLinecap="round">
+                <line x1="22" y1="-98" x2="42" y2="-112" />
+                <line x1="28" y1="-84" x2="50" y2="-88" />
+              </g>
+            )}
           </g>
         </g>
       </g>
     </svg>
   );
 };
+

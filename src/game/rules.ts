@@ -9,6 +9,7 @@ import {
   BodyBuild,
   CombatCard,
   FighterAppearance,
+  FighterPose,
   FighterProfile,
   FighterStats,
   Gender,
@@ -16,11 +17,13 @@ import {
   Hairstyle,
   MatchMode,
   OpponentProfile,
+  TurnExchangeStep,
   TurnResolutionSummary,
 } from '../types/game';
 
 export const MAX_ROUNDS = 5;
 export const TURNS_PER_ROUND = 8;
+export const TURN_TIMER_SECONDS = 15;
 export const DECK_SIZE = 10;
 export const CREATION_STAT_POINTS = 15;
 export const BASE_STAT_VALUE = 3;
@@ -333,6 +336,61 @@ export function chooseAiAction(
   return playable[Math.floor(rng() * playable.length)];
 }
 
+export function chooseAutoTimeoutAction(
+  handIds: string[],
+  state: CombatantState,
+  customCards?: CombatCard[]
+): CombatCard | 'REST' {
+  const playable = handIds
+    .map((id) => getCardById(id, customCards))
+    .filter((c): c is CombatCard => c !== undefined)
+    .filter((c) => c.staCost <= state.sta);
+
+  if (playable.length === 0) {
+    return 'REST';
+  }
+  playable.sort((a, b) => a.speed - b.speed || a.staCost - b.staCost);
+  return playable[0];
+}
+
+export function mapCardToFighterPose(choice: CombatCard | 'REST'): FighterPose {
+  if (choice === 'REST') return 'idle';
+  switch (choice.artType) {
+    case 'jab':
+    case 'uppercut':
+      return 'jab';
+    case 'hook':
+      return 'hook';
+    case 'roundhouse':
+    case 'sidekick':
+    case 'lowkick':
+      return 'kick';
+    case 'elbow':
+      return 'elbow';
+    case 'knee':
+      return 'knee';
+    case 'headbutt':
+    case 'desperation':
+      return 'headbutt';
+    case 'slam':
+      return 'slam';
+    case 'evade':
+      return 'evade';
+    case 'parry':
+      return 'parry';
+    case 'catchkick':
+      return 'catchkick';
+    case 'block':
+    case 'sprawl':
+    case 'surge':
+    case 'mani':
+    case 'groggy':
+      return 'block';
+    default:
+      return 'idle';
+  }
+}
+
 function isKickCard(card: CombatCard): boolean {
   return card.artType === 'roundhouse' || card.artType === 'sidekick' || card.artType === 'lowkick';
 }
@@ -421,6 +479,7 @@ export function resolveTurn(params: {
   let aiCutApplied = false;
   let playerHealed = 0;
   let aiHealed = 0;
+  const steps: TurnExchangeStep[] = [];
 
   // Handle immediate self-buffs (Mani / Adrenaline) before strike exchange
   const applySupportEffects = (
@@ -470,6 +529,9 @@ export function resolveTurn(params: {
 
     const rawDamage = calculateEffectivePower(attackCard, atkStats, atkGym);
 
+    const attackerPose = mapCardToFighterPose(attackCard);
+    const defenderSide: 'player' | 'ai' = attackerSide === 'player' ? 'ai' : 'player';
+
     // Check defensive response
     if (
       defenderChoice !== 'REST' &&
@@ -491,6 +553,18 @@ export function resolveTurn(params: {
           playerDamageDealt += counterDmg;
           aiBlocked += rawDamage;
         }
+        steps.push({
+          actor: attackerSide,
+          defender: defenderSide,
+          actorPose: atkState.hp <= 0 ? 'ko' : attackerPose,
+          defenderPose: 'catchkick',
+          damageDealt: 0,
+          counterDamage: counterDmg,
+          blocked: rawDamage,
+          evaded: false,
+          cutApplied: false,
+          isHeavy: counterDmg >= 11,
+        });
         logs.push(`${defName} caught the ${attackCard.name} and swept for ${counterDmg} DMG!`);
         return;
       }
@@ -507,6 +581,18 @@ export function resolveTurn(params: {
           playerDamageDealt += counterDmg;
           aiBlocked += rawDamage;
         }
+        steps.push({
+          actor: attackerSide,
+          defender: defenderSide,
+          actorPose: atkState.hp <= 0 ? 'ko' : attackerPose,
+          defenderPose: 'block',
+          damageDealt: 0,
+          counterDamage: counterDmg,
+          blocked: rawDamage,
+          evaded: false,
+          cutApplied: false,
+          isHeavy: false,
+        });
         logs.push(`${defName} sprawled the ${attackCard.name}, resetting range for ${counterDmg} counter DMG!`);
         return;
       }
@@ -527,6 +613,18 @@ export function resolveTurn(params: {
           playerDamageDealt += counterDmg;
           playerBlocked += Math.min(rawDamage, defVal);
         }
+        steps.push({
+          actor: attackerSide,
+          defender: defenderSide,
+          actorPose: atkState.hp <= 0 ? 'ko' : attackerPose,
+          defenderPose: defState.hp <= 0 ? 'ko' : 'parry',
+          damageDealt: bleedThrough,
+          counterDamage: counterDmg,
+          blocked: Math.min(rawDamage, defVal),
+          evaded: false,
+          cutApplied: false,
+          isHeavy: counterDmg >= 11,
+        });
         logs.push(`${defName} parried ${attackCard.name} and countered for ${counterDmg} DMG!`);
         return;
       }
@@ -540,6 +638,18 @@ export function resolveTurn(params: {
         if (evadeSuccess) {
           if (attackerSide === 'player') aiEvaded = true;
           else playerEvaded = true;
+          steps.push({
+            actor: attackerSide,
+            defender: defenderSide,
+            actorPose: attackerPose,
+            defenderPose: 'evade',
+            damageDealt: 0,
+            counterDamage: 0,
+            blocked: 0,
+            evaded: true,
+            cutApplied: false,
+            isHeavy: false,
+          });
           logs.push(`${defName} slipped clean past ${atkName} ${attackCard.name}! EVADED!`);
           return;
         }
@@ -562,6 +672,18 @@ export function resolveTurn(params: {
         aiDamageDealt += finalDamage;
         playerBlocked += mitigated;
       }
+      steps.push({
+        actor: attackerSide,
+        defender: defenderSide,
+        actorPose: attackerPose,
+        defenderPose: defState.hp <= 0 ? 'ko' : 'block',
+        damageDealt: finalDamage,
+        counterDamage: 0,
+        blocked: mitigated,
+        evaded: false,
+        cutApplied: false,
+        isHeavy: finalDamage >= 11,
+      });
       if (defenderChoice.specialEffect === 'prevent_ko' && defState.hp === 1) {
         logs.push(`${defName} survived on sheer grit (Groggy Recovery prevented knockdown)!`);
       } else {
@@ -585,11 +707,13 @@ export function resolveTurn(params: {
 
     logs.push(`${atkName} ${attackCard.name} lands clean for ${finalDamage} DMG!`);
 
+    let stepCutApplied = false;
     // Special strike effects on clean hit
     if (attackCard.specialEffect === 'bleed_cut' && rng() < 0.65) {
       defState.bleedTurns = Math.max(defState.bleedTurns, 2);
       if (attackerSide === 'player') aiCutApplied = true;
       else playerCutApplied = true;
+      stepCutApplied = true;
       logs.push(`CUT! ${defName} is bleeding heavily!`);
     } else if (attackCard.specialEffect === 'drain_sta') {
       defState.sta = Math.max(0, defState.sta - 1);
@@ -600,6 +724,19 @@ export function resolveTurn(params: {
     } else if (attackCard.specialEffect === 'reset_distance') {
       logs.push(`Impact resets both fighters cleanly to standing range.`);
     }
+
+    steps.push({
+      actor: attackerSide,
+      defender: defenderSide,
+      actorPose: attackerPose,
+      defenderPose: defState.hp <= 0 ? 'ko' : 'hit',
+      damageDealt: finalDamage,
+      counterDamage: 0,
+      blocked: 0,
+      evaded: false,
+      cutApplied: stepCutApplied,
+      isHeavy: finalDamage >= 11,
+    });
   };
 
   const playerIsStrike =
@@ -648,6 +785,7 @@ export function resolveTurn(params: {
       aiCutApplied,
       playerHealed,
       aiHealed,
+      steps,
       logs,
     },
   };

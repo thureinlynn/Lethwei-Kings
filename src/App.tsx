@@ -7,16 +7,20 @@ import { generateOpponent } from './game/rules';
 import {
   FighterProfile,
   GameScreen,
+  Language,
   MatchMode,
   OpponentProfile,
 } from './types/game';
 import {
   createQuickStartDemoFighter,
   loadCareer,
+  loadLanguage,
   saveCareer,
+  saveLanguage,
 } from './utils/storage';
 
 export default function App() {
+  const [lang, setLang] = useState<Language>(() => loadLanguage());
   const [savedFighter, setSavedFighter] = useState<FighterProfile | null>(() =>
     loadCareer()
   );
@@ -55,6 +59,14 @@ export default function App() {
       document.body.dataset.state = 'hub';
     }
   }, [screen]);
+
+  const handleToggleLang = () => {
+    setLang((prev) => {
+      const next: Language = prev === 'en' ? 'my' : 'en';
+      saveLanguage(next);
+      return next;
+    });
+  };
 
   const handleUpdateFighter = (updated: FighterProfile) => {
     setFighter(updated);
@@ -140,6 +152,8 @@ export default function App() {
     return (
       <TitleScreen
         savedFighter={savedFighter}
+        lang={lang}
+        onToggleLang={handleToggleLang}
         onNewCareer={() => setScreen('creation')}
         onContinueCareer={handleContinueCareer}
       />
@@ -149,6 +163,8 @@ export default function App() {
   if (screen === 'creation') {
     return (
       <CharacterCreation
+        lang={lang}
+        onToggleLang={handleToggleLang}
         onBack={() => setScreen('title')}
         onConfirm={handleConfirmNewFighter}
       />
@@ -162,6 +178,8 @@ export default function App() {
         fighter={fighter}
         opponent={activeMatch.opponent}
         mode={activeMatch.mode}
+        lang={lang}
+        onToggleLang={handleToggleLang}
         onMatchFinish={handleMatchFinish}
         onExitToHub={() => {
           setActiveMatch(null);
@@ -176,6 +194,8 @@ export default function App() {
     return (
       <FighterHub
         fighter={fighter}
+        lang={lang}
+        onToggleLang={handleToggleLang}
         onUpdateFighter={handleUpdateFighter}
         onStartMatch={handleStartMatch}
         onBackToTitle={() => setScreen('title')}
@@ -186,6 +206,8 @@ export default function App() {
   return (
     <TitleScreen
       savedFighter={savedFighter}
+      lang={lang}
+      onToggleLang={handleToggleLang}
       onNewCareer={() => setScreen('creation')}
       onContinueCareer={handleContinueCareer}
     />

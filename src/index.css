@@ -2,8 +2,8 @@
 
 @layer base {
   :root {
-    --font-display: 'Barlow Condensed', system-ui, sans-serif;
-    --font-sans: 'Plus Jakarta Sans', system-ui, sans-serif;
+    --font-display: 'Barlow Condensed', 'Noto Sans Myanmar', system-ui, sans-serif;
+    --font-sans: 'Plus Jakarta Sans', 'Noto Sans Myanmar', system-ui, sans-serif;
     --font-mono: 'JetBrains Mono', monospace;
   }
 
@@ -45,6 +45,250 @@
   background-size: 12px 12px;
 }
 
+@keyframes rhythmBounce {
+  0%, 100% {
+    transform: translate3d(0px, 0px, 0) rotate(0deg);
+  }
+  25% {
+    transform: translate3d(4px, -4px, 0) rotate(1.8deg);
+  }
+  50% {
+    transform: translate3d(1px, 2px, 0) rotate(0deg);
+  }
+  75% {
+    transform: translate3d(-3px, -3px, 0) rotate(-1.5deg);
+  }
+}
+
+@keyframes rhythmHead {
+  0%, 100% { transform: rotate(2deg); }
+  35% { transform: rotate(-4deg); }
+  70% { transform: rotate(5deg); }
+}
+
+@keyframes rhythmLeadUpperArm {
+  0%, 100% { transform: rotate(0deg); }
+  50% { transform: rotate(-9deg) translate3d(2px, -2px, 0); }
+}
+
+@keyframes rhythmLeadForearm {
+  0%, 100% { transform: rotate(0deg); }
+  50% { transform: rotate(-10deg); }
+}
+
+@keyframes rhythmRearUpperArm {
+  0%, 100% { transform: rotate(0deg); }
+  50% { transform: rotate(-7deg); }
+}
+
+@keyframes rhythmFrontLeg {
+  0%, 100% { transform: rotate(0deg); }
+  30% { transform: rotate(-6deg); }
+  65% { transform: rotate(3deg); }
+}
+
+@keyframes rhythmFrontShin {
+  0%, 100% { transform: rotate(0deg); }
+  30% { transform: rotate(7deg); }
+  65% { transform: rotate(-3deg); }
+}
+
+@keyframes rhythmBackLeg {
+  0%, 100% { transform: rotate(0deg); }
+  50% { transform: rotate(5deg); }
+}
+
+/* ===== STRIKE & DEFENSE JOINT ANIMATIONS (580ms windup -> peak impact -> follow-through) ===== */
+@keyframes bodyJab {
+  0% { transform: translate3d(0, 0, 0) rotate(0deg); }
+  20% { transform: translate3d(-4px, 2px, 0) rotate(-3deg); }
+  52% { transform: translate3d(22px, 2px, 0) rotate(10deg); }
+  100% { transform: translate3d(14px, 0, 0) rotate(6deg); }
+}
+@keyframes armJabLead {
+  0% { transform: rotate(0deg); }
+  20% { transform: rotate(10deg); }
+  52% { transform: rotate(-72deg); }
+  100% { transform: rotate(-58deg); }
+}
+@keyframes foreJabLead {
+  0% { transform: rotate(0deg); }
+  20% { transform: rotate(-10deg); }
+  52% { transform: rotate(106deg); }
+  100% { transform: rotate(84deg); }
+}
+
+@keyframes bodyHook {
+  0% { transform: translate3d(0, 0, 0) rotate(0deg); }
+  22% { transform: translate3d(-5px, 3px, 0) rotate(-8deg); }
+  54% { transform: translate3d(22px, 3px, 0) rotate(15deg); }
+  100% { transform: translate3d(14px, 1px, 0) rotate(9deg); }
+}
+@keyframes armHookRear {
+  0% { transform: rotate(0deg); }
+  22% { transform: rotate(22deg); }
+  54% { transform: rotate(-76deg); }
+  100% { transform: rotate(-56deg); }
+}
+@keyframes foreHookRear {
+  0% { transform: rotate(0deg); }
+  22% { transform: rotate(-14deg); }
+  54% { transform: rotate(106deg); }
+  100% { transform: rotate(82deg); }
+}
+
+@keyframes bodyElbow {
+  0% { transform: translate3d(0, 0, 0) rotate(0deg); }
+  22% { transform: translate3d(-4px, 2px, 0) rotate(-6deg); }
+  54% { transform: translate3d(26px, -2px, 0) rotate(18deg); }
+  100% { transform: translate3d(16px, 0, 0) rotate(12deg); }
+}
+@keyframes armElbowLead {
+  0% { transform: rotate(0deg); }
+  22% { transform: rotate(18deg); }
+  54% { transform: rotate(-98deg); }
+  100% { transform: rotate(-80deg); }
+}
+@keyframes foreElbowLead {
+  0% { transform: rotate(0deg); }
+  54% { transform: rotate(-64deg); }
+  100% { transform: rotate(-50deg); }
+}
+
+@keyframes bodyHeadbutt {
+  0% { transform: translate3d(0, 0, 0) rotate(0deg); }
+  22% { transform: translate3d(6px, 4px, 0) rotate(-8deg); }
+  55% { transform: translate3d(28px, 6px, 0) rotate(24deg); }
+  100% { transform: translate3d(18px, 4px, 0) rotate(16deg); }
+}
+@keyframes headSnapButt {
+  0% { transform: rotate(0deg); }
+  22% { transform: rotate(-18deg); }
+  55% { transform: rotate(28deg); }
+  100% { transform: rotate(16deg); }
+}
+
+@keyframes bodyKick {
+  0% { transform: translate3d(0, 0, 0) rotate(0deg); }
+  22% { transform: translate3d(4px, 4px, 0) rotate(4deg); }
+  54% { transform: translate3d(14px, -6px, 0) rotate(-18deg); }
+  100% { transform: translate3d(10px, -3px, 0) rotate(-12deg); }
+}
+@keyframes legKickFront {
+  0% { transform: rotate(0deg); }
+  22% { transform: rotate(-28deg); }
+  54% { transform: rotate(-92deg); }
+  100% { transform: rotate(-76deg); }
+}
+@keyframes shinKickFront {
+  0% { transform: rotate(0deg); }
+  22% { transform: rotate(48deg); }
+  54% { transform: rotate(-26deg); }
+  100% { transform: rotate(-14deg); }
+}
+@keyframes headCounterBalance {
+  0% { transform: rotate(0deg); }
+  54% { transform: rotate(16deg); }
+  100% { transform: rotate(10deg); }
+}
+
+@keyframes bodyKnee {
+  0% { transform: translate3d(0, 0, 0) rotate(0deg); }
+  22% { transform: translate3d(6px, 5px, 0) rotate(4deg); }
+  54% { transform: translate3d(22px, -12px, 0) rotate(8deg); }
+  100% { transform: translate3d(14px, -6px, 0) rotate(4deg); }
+}
+@keyframes legKneeFront {
+  0% { transform: rotate(0deg); }
+  54% { transform: rotate(-78deg); }
+  100% { transform: rotate(-62deg); }
+}
+@keyframes shinKneeFront {
+  0% { transform: rotate(0deg); }
+  54% { transform: rotate(74deg); }
+  100% { transform: rotate(58deg); }
+}
+
+@keyframes legLungeFront {
+  0% { transform: rotate(0deg); }
+  54% { transform: rotate(-16deg); }
+  100% { transform: rotate(-10deg); }
+}
+@keyframes shinLungeFront {
+  0% { transform: rotate(0deg); }
+  54% { transform: rotate(18deg); }
+  100% { transform: rotate(10deg); }
+}
+@keyframes legDriveBack {
+  0% { transform: rotate(0deg); }
+  54% { transform: rotate(18deg); }
+  100% { transform: rotate(12deg); }
+}
+
+@keyframes bodyBlock {
+  0% { transform: translate3d(0, 0, 0) rotate(0deg); }
+  38% { transform: translate3d(-10px, 6px, 0) rotate(-5deg); }
+  100% { transform: translate3d(-5px, 4px, 0) rotate(-2deg); }
+}
+@keyframes armBlockTight {
+  0% { transform: rotate(0deg); }
+  38% { transform: rotate(-38deg); }
+  100% { transform: rotate(-30deg); }
+}
+@keyframes foreBlockTight {
+  0% { transform: rotate(0deg); }
+  38% { transform: rotate(-14deg); }
+  100% { transform: rotate(-10deg); }
+}
+@keyframes headTuck {
+  0% { transform: rotate(0deg); }
+  45% { transform: rotate(16deg); }
+  100% { transform: rotate(12deg); }
+}
+
+@keyframes bodyEvade {
+  0% { transform: translate3d(0, 0, 0) rotate(0deg); }
+  45% { transform: translate3d(-20px, 16px, 0) rotate(-24deg); }
+  100% { transform: translate3d(-12px, 10px, 0) rotate(-14deg); }
+}
+@keyframes headEvadeSlip {
+  0% { transform: rotate(0deg); }
+  45% { transform: rotate(-18deg); }
+  100% { transform: rotate(-10deg); }
+}
+@keyframes legBendDeep {
+  0% { transform: rotate(0deg); }
+  45% { transform: rotate(-24deg); }
+  100% { transform: rotate(-16deg); }
+}
+@keyframes shinBendDeep {
+  0% { transform: rotate(0deg); }
+  45% { transform: rotate(28deg); }
+  100% { transform: rotate(18deg); }
+}
+
+@keyframes bodyHit {
+  0% { transform: translate3d(0, 0, 0) rotate(0deg); }
+  32% { transform: translate3d(-20px, 4px, 0) rotate(-22deg); }
+  100% { transform: translate3d(-10px, 2px, 0) rotate(-11deg); }
+}
+@keyframes headWhipBack {
+  0% { transform: rotate(0deg); }
+  32% { transform: rotate(-34deg); }
+  100% { transform: rotate(-18deg); }
+}
+@keyframes armShockFlail {
+  0% { transform: rotate(0deg); }
+  32% { transform: rotate(28deg); }
+  100% { transform: rotate(16deg); }
+}
+
+@keyframes bodyKoFall {
+  0% { transform: translate3d(0, 0, 0) rotate(0deg); }
+  45% { transform: translate3d(-18px, 34px, 0) rotate(-48deg); }
+  100% { transform: translate3d(-26px, 76px, 0) rotate(-82deg); }
+}
+
 @keyframes hitShake {
   0%, 100% { transform: translate3d(0, 0, 0); }
   20% { transform: translate3d(-8px, 4px, 0) rotate(-1deg); }
@@ -69,6 +313,60 @@
   100% { opacity: 0; transform: translate3d(-50%, -62px, 0) scale(0.95); }
 }
 
+.anim-rhythm-body { animation: rhythmBounce 0.92s ease-in-out infinite; }
+.anim-rhythm-body-alt { animation: rhythmBounce 1.02s ease-in-out infinite reverse; }
+.anim-rhythm-head { animation: rhythmHead 1.3s ease-in-out infinite; }
+.anim-rhythm-arm-lead { animation: rhythmLeadUpperArm 0.78s ease-in-out infinite; }
+.anim-rhythm-fore-lead { animation: rhythmLeadForearm 0.78s ease-in-out infinite; }
+.anim-rhythm-arm-rear { animation: rhythmRearUpperArm 0.92s ease-in-out infinite; }
+.anim-rhythm-leg-front { animation: rhythmFrontLeg 0.92s ease-in-out infinite; }
+.anim-rhythm-shin-front { animation: rhythmFrontShin 0.92s ease-in-out infinite; }
+.anim-rhythm-leg-back { animation: rhythmBackLeg 0.92s ease-in-out infinite; }
+
+.anim-body-jab { animation: bodyJab 520ms cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+.anim-arm-jab-lead { animation: armJabLead 520ms cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+.anim-fore-jab-lead { animation: foreJabLead 520ms cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+
+.anim-body-hook { animation: bodyHook 520ms cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+.anim-arm-hook-rear { animation: armHookRear 520ms cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+.anim-fore-hook-rear { animation: foreHookRear 520ms cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+
+.anim-body-elbow { animation: bodyElbow 520ms cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+.anim-arm-elbow-lead { animation: armElbowLead 520ms cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+.anim-fore-elbow-lead { animation: foreElbowLead 520ms cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+
+.anim-body-headbutt { animation: bodyHeadbutt 540ms cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+.anim-head-butt { animation: headSnapButt 540ms cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+
+.anim-body-kick { animation: bodyKick 540ms cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+.anim-leg-kick { animation: legKickFront 540ms cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+.anim-shin-kick { animation: shinKickFront 540ms cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+.anim-head-balance { animation: headCounterBalance 540ms cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+
+.anim-body-knee { animation: bodyKnee 520ms cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+.anim-leg-knee { animation: legKneeFront 520ms cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+.anim-shin-knee { animation: shinKneeFront 520ms cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+
+.anim-leg-lunge { animation: legLungeFront 520ms cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+.anim-shin-lunge { animation: shinLungeFront 520ms cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+.anim-leg-drive { animation: legDriveBack 520ms cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+
+.anim-body-block { animation: bodyBlock 480ms cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+.anim-arm-block { animation: armBlockTight 480ms cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+.anim-fore-block { animation: foreBlockTight 480ms cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+.anim-head-tuck { animation: headTuck 480ms cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+
+.anim-body-evade { animation: bodyEvade 520ms cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+.anim-head-evade { animation: headEvadeSlip 520ms cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+.anim-leg-bend { animation: legBendDeep 520ms cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+.anim-shin-bend { animation: shinBendDeep 520ms cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+
+.anim-body-hit { animation: bodyHit 500ms cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+.anim-head-hit { animation: headWhipBack 500ms cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+.anim-arm-hit { animation: armShockFlail 500ms cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+
+.anim-body-ko { animation: bodyKoFall 650ms cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+
 .animate-hit-shake {
   animation: hitShake 280ms cubic-bezier(0.22, 1, 0.36, 1);
 }
@@ -82,6 +380,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  [class*="anim-"],
   .animate-hit-shake,
   .animate-heavy-shake,
   .animate-float-damage {

@@ -184,6 +184,7 @@ Rules:
         typeof req.body?.prompt === 'string' && req.body.prompt.trim().length > 0
           ? req.body.prompt.trim()
           : 'A creative Myanmar Lethwei standing elbow or headbutt technique';
+      const lang = req.body?.lang === 'my' ? 'my' : 'en';
 
       const ai = getGeminiClient();
 
@@ -199,7 +200,8 @@ STRICT MYANMAR LETHWEI GAMEPLAY CONSTRAINTS:
   * staCost: integer 0 to 4.
   * power: for Striking, 4 to 15 (higher power must cost >= 2 STA and >= 2 SPD); for Defense, 4 to 11.
   * speed: integer 1 to 5 (1 = fastest priority, 5 = heaviest/slowest).
-  * description: punchy 1-line card text (under 75 chars).`,
+  * description: punchy 1-line card text (under 75 chars).
+${lang === 'my' ? '- LANGUAGE REQUIREMENT: Write the card "name" and "description" in natural Burmese (Myanmar Unicode script). Keep all enum fields in exact English schema values.' : ''}`,
         config: {
           systemInstruction:
             'You are a lead combat designer for a 2D Turn-Based Myanmar Lethwei card game. Return strictly standing-combat-legal cards matching the exact JSON schema.',

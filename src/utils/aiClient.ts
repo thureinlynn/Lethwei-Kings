@@ -1,4 +1,9 @@
-import { calculateMaxHp, calculateMaxSta } from '../game/rules';
+import {
+  buildValid40CardPool,
+  calculateMaxHp,
+  calculateMaxSta,
+  createInitialSkills,
+} from '../game/rules';
 import {
   CombatCard,
   FighterProfile,
@@ -70,6 +75,9 @@ export async function generateAiSkillCard(
     name: raw.name,
     discipline: raw.discipline,
     category: raw.category,
+    tier: raw.tier ?? 'II',
+    position: raw.position ?? 'Standing',
+    skillKey: raw.skillKey,
     staCost: Math.max(1, Math.min(4, Number(raw.staCost) || 2)),
     power: Math.max(4, Math.min(15, Number(raw.power) || 8)),
     speed: Math.max(1, Math.min(5, Number(raw.speed) || 2)),
@@ -89,20 +97,6 @@ export function buildAiOpponentFromGenerated(
   const maxHp = calculateMaxHp(gen.stats, gen.gymId);
   const maxSta = calculateMaxSta(gen.stats, gen.gymId);
 
-  // Mix player's unlocked style + core striking deck
-  const baseDeck = [
-    'straight_jab',
-    'body_hook',
-    'karate_roundhouse',
-    'low_kick',
-    'spinning_elbow',
-    'clinch_knee',
-    'lethwei_headbutt',
-    'high_guard',
-    'slip_evade',
-    'catch_kick',
-  ];
-
   return {
     id: `ai_opp_${Date.now()}`,
     name: gen.name,
@@ -114,9 +108,10 @@ export function buildAiOpponentFromGenerated(
     background: gen.background,
     appearance: gen.appearance,
     stats: gen.stats,
+    skills: createInitialSkills(gen.gymId, 30),
     maxHp: Math.max(55, Math.round((maxHp + player.maxHp) * 0.5)),
     maxSta,
-    deckIds: baseDeck,
+    deckIds: buildValid40CardPool(22, 18),
     difficultyTier: 2,
     isAiGenerated: true,
   };

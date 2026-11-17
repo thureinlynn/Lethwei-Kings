@@ -16,6 +16,7 @@ import {
   Sparkles,
   Swords,
   Trash2,
+  Triangle,
   Trophy,
   Zap,
 } from 'lucide-react';
@@ -29,16 +30,28 @@ import {
   UI_TEXT,
 } from '../i18n/translations';
 import {
+  ALL_SKILL_KEYS,
   CHAMPIONSHIP_UNLOCK_WINS,
+  computeStanceRadar,
+  createInitialSkills,
   DECK_SIZE,
+  generateOpponent,
+  getTotalSkillPoints,
   isChampionshipUnlocked,
+  MAX_SKILL_CAP,
+  MIN_DEFENSE_CARDS,
+  MIN_STRIKE_CARDS,
+  SKILL_LABELS,
+  upgradeFighterSkill,
   validateDeck,
 } from '../game/rules';
 import {
   CardCategory,
   CombatCard as CombatCardType,
+  CombatPosition,
   Discipline,
   FighterProfile,
+  FightSkillKey,
   Language,
   MatchMode,
   OpponentProfile,
@@ -51,6 +64,7 @@ import {
 import { soundEngine } from '../utils/sound';
 import { CombatCard } from './CombatCard';
 import { FighterAvatar } from './FighterAvatar';
+import { PreFightPlannerModal } from './PreFightPlannerModal';
 
 interface FighterHubProps {
   fighter: FighterProfile;
@@ -75,6 +89,7 @@ export const FighterHub: React.FC<FighterHubProps> = ({
   const [activeTab, setActiveTab] = useState<HubTab>('arena');
   const [selectedDiscipline, setSelectedDiscipline] = useState<Discipline>('Lethwei');
   const [deckFilter, setDeckFilter] = useState<'All' | CardCategory>('All');
+  const [posFilter, setPosFilter] = useState<'All' | CombatPosition>('All');
   const [feedback, setFeedback] = useState<string>('');
   const [errorBanner, setErrorBanner] = useState<string>('');
 
@@ -85,12 +100,23 @@ export const FighterHub: React.FC<FighterHubProps> = ({
 
   const [aiRivalPrompt, setAiRivalPrompt] = useState('');
   const [aiRivalLoading, setAiRivalLoading] = useState(false);
+  const [pendingBout, setPendingBout] = useState<{
+    mode: MatchMode;
+    opponent: OpponentProfile;
+  } | null>(null);
 
   const gym = GYMS[fighter.gymId];
   const gymDisplay = lang === 'my' ? GYM_MY[fighter.gymId] : gym;
   const champUnlocked = isChampionshipUnlocked(fighter);
   const customCards = fighter.customCards ?? [];
+  const skills = fighter.skills ?? createInitialSkills(fighter.gymId, 25);
+  const totalSkillPoints = getTotalSkillPoints(skills);
+  const stanceRadar = computeStanceRadar(fighter.activeDeckIds, customCards);
   const deckCheck = validateDeck(fighter.activeDeckIds, fighter.unlockedCardIds, customCards);
+  const deckStrikeCount = fighter.activeDeckIds.filter(
+    (id) => getCardById(id, customCards)?.category === 'Striking'
+  ).length;
+  const deckDefenseCount = fighter.activeDeckIds.length - deckStrikeCount;
 
   const showToast = (msg: string) => {
     setErrorBanner('');
@@ -143,7 +169,7 @@ export const FighterHub: React.FC<FighterHubProps> = ({
         currentHp: fighter.maxHp + 4,
         stats: { ...fighter.stats, durability: fighter.stats.durability + 1 },
       });
-      showToast('Iron Chin Drill complete: +4 Max HP & +1 Durability!');
+      showToast('Iron Chin Drill complete: +4 Max HP & +1 Health!');
     } else {
       onUpdateFighter({
         ...fighter,
@@ -153,8 +179,21 @@ export const FighterHub: React.FC<FighterHubProps> = ({
         currentSta: fighter.maxSta + 1,
         stats: { ...fighter.stats, stamina: fighter.stats.stamina + 1 },
       });
-      showToast('Heavy Bag Roadwork complete: +1 Max STA & +1 Stamina!');
+      showToast('Heavy Bag Roadwork complete: +1 Max STA & +1 Condition!');
     }
+  };
+
+  const handleTrainSkill = (skillKey: FightSkillKey) => {
+    const res = upgradeFighterSkill(fighter, skillKey, 20, 5);
+    if (!res.upgraded) {
+      showToast(res.reason ?? 'Cannot train skill.');
+      return;
+    }
+    soundEngine.playBell(1);
+    onUpdateFighter(res.fighter);
+    showToast(
+      `Trained ${lang === 'my' ? SKILL_LABELS[skillKey].my : SKILL_LABELS[skillKey].en} (+5)!`
+    );
   };
 
   const handleForgeAiCard = async () => {
@@ -201,12 +240,20 @@ export const FighterHub: React.FC<FighterHubProps> = ({
       );
       const customOpponent = buildAiOpponentFromGenerated(gen, fighter);
       soundEngine.playBell(1);
-      onStartMatch('sparring', customOpponent);
+      setPendingBout({ mode: 'sparring', opponent: customOpponent });
     } catch (err: unknown) {
       setErrorBanner(err instanceof Error ? err.message : 'Failed to generate AI challenger.');
     } finally {
       setAiRivalLoading(false);
     }
+  };
+
+  const openPreFightPlanner = (mode: MatchMode) => {
+    soundEngine.playClick();
+    setPendingBout({
+      mode,
+      opponent: generateOpponent(fighter, mode),
+    });
   };
 
   const handleAddCardToDeck = (cardId: string) => {
@@ -246,7 +293,7 @@ export const FighterHub: React.FC<FighterHubProps> = ({
       ...fighter,
       activeDeckIds: [...DEFAULT_STARTER_DECK],
     });
-    showToast('Restored balanced 10-card starter Fight Deck.');
+    showToast(`Restored balanced ${DECK_SIZE}-card starter Fight Deck (20 ATK / 20 DEF).`);
   };
 
   const disciplineCards = CARD_DATABASE.filter(
@@ -256,7 +303,8 @@ export const FighterHub: React.FC<FighterHubProps> = ({
   const unlockedCardsForBuilder = fighter.unlockedCardIds
     .map((id) => getCardById(id, customCards))
     .filter((c): c is NonNullable<typeof c> => Boolean(c))
-    .filter((c) => deckFilter === 'All' || c.category === deckFilter);
+    .filter((c) => deckFilter === 'All' || c.category === deckFilter)
+    .filter((c) => posFilter === 'All' || (c.position ?? 'Standing') === posFilter || c.position === 'Any');
 
   const deckAvgSta =
     fighter.activeDeckIds.length > 0
@@ -423,7 +471,7 @@ export const FighterHub: React.FC<FighterHubProps> = ({
               </div>
             </div>
 
-            {/* Base Stats */}
+            {/* 4 Core Attributes: Strength, Agility, Condition, Health */}
             <div className="grid grid-cols-2 gap-2 text-xs">
               <div className="flex items-center justify-between px-2.5 py-1.5 rounded bg-[#101217] border border-zinc-800">
                 <span className="text-zinc-300">{t.strength}</span>
@@ -440,6 +488,34 @@ export const FighterHub: React.FC<FighterHubProps> = ({
               <div className="flex items-center justify-between px-2.5 py-1.5 rounded bg-[#101217] border border-zinc-800">
                 <span className="text-zinc-300">{t.durability}</span>
                 <span className="font-mono-num font-bold text-amber-400">{fighter.stats.durability}</span>
+              </div>
+            </div>
+
+            {/* Compact Fight Skills & Stance Radar Summary */}
+            <div className="p-2.5 rounded-lg bg-[#101217] border border-zinc-800 space-y-1.5">
+              <div className="flex items-center justify-between text-[11px]">
+                <span className="font-bold text-amber-300 uppercase tracking-wider">{t.fightSkillsTitle}</span>
+                <span className="font-mono-num text-zinc-400">
+                  {totalSkillPoints} / {MAX_SKILL_CAP.toLocaleString()}
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px] text-zinc-300">
+                <div className="flex justify-between">
+                  <span className="text-zinc-400">Punches / Elbows</span>
+                  <span className="font-mono-num text-white">{skills.Punches} / {skills.Elbows}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-zinc-400">Takedowns / Sub</span>
+                  <span className="font-mono-num text-white">{skills.Takedowns} / {skills.Submission}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-zinc-400">Strike / Kick Def</span>
+                  <span className="font-mono-num text-sky-300">{skills.Strike_Def} / {skills.Kick_Def}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-zinc-400">TD / Sub Def</span>
+                  <span className="font-mono-num text-sky-300">{skills.Takedown_Def} / {skills.Submission_Def}</span>
+                </div>
               </div>
             </div>
           </div>
@@ -527,7 +603,7 @@ export const FighterHub: React.FC<FighterHubProps> = ({
               <>
                 {!deckCheck.valid && (
                   <div className="p-3 rounded-lg bg-red-950/70 border border-red-500 text-red-200 text-xs">
-                    {deckCheck.reason} Open <strong>GAME PLAN</strong> to complete your 10-card Fight Deck.
+                    {deckCheck.reason} Open <strong>GAME PLAN</strong> to complete your {DECK_SIZE}-card Fight Deck.
                   </div>
                 )}
 
@@ -547,10 +623,7 @@ export const FighterHub: React.FC<FighterHubProps> = ({
                   <button
                     type="button"
                     disabled={!deckCheck.valid}
-                    onClick={() => {
-                      soundEngine.playBell(1);
-                      onStartMatch('sparring');
-                    }}
+                    onClick={() => openPreFightPlanner('sparring')}
                     className="px-5 py-3 rounded-lg bg-sky-600 hover:bg-sky-500 disabled:opacity-45 text-white font-display font-extrabold text-lg comic-panel-sm shrink-0 cursor-pointer whitespace-nowrap"
                   >
                     {t.startSparring}
@@ -576,10 +649,7 @@ export const FighterHub: React.FC<FighterHubProps> = ({
                   <button
                     type="button"
                     disabled={!deckCheck.valid}
-                    onClick={() => {
-                      soundEngine.playBell(1);
-                      onStartMatch('local');
-                    }}
+                    onClick={() => openPreFightPlanner('local')}
                     className="px-5 py-3 rounded-lg bg-red-600 hover:bg-red-500 disabled:opacity-45 text-white font-display font-extrabold text-lg comic-panel-sm shrink-0 cursor-pointer whitespace-nowrap"
                   >
                     {t.enterOfficialBout}
@@ -616,10 +686,7 @@ export const FighterHub: React.FC<FighterHubProps> = ({
                     <button
                       type="button"
                       disabled={!deckCheck.valid}
-                      onClick={() => {
-                        soundEngine.playBell(2);
-                        onStartMatch('championship');
-                      }}
+                      onClick={() => openPreFightPlanner('championship')}
                       className="px-5 py-3 rounded-lg bg-amber-500 hover:bg-amber-400 text-black font-display font-extrabold text-lg comic-panel-sm shrink-0 cursor-pointer whitespace-nowrap"
                     >
                       {t.challengeBelt}
@@ -763,7 +830,7 @@ export const FighterHub: React.FC<FighterHubProps> = ({
                         <span className="font-mono-num text-xs font-bold text-amber-300">35 XP</span>
                       </div>
                       <div className="font-display font-bold text-base text-white">IRON CHIN DRILL</div>
-                      <div className="text-[11px] text-zinc-400">+4 Max HP &amp; +1 Durability</div>
+                      <div className="text-[11px] text-zinc-400">+4 Max HP &amp; +1 Health</div>
                     </button>
 
                     <button
@@ -776,7 +843,7 @@ export const FighterHub: React.FC<FighterHubProps> = ({
                         <span className="font-mono-num text-xs font-bold text-amber-300">35 XP</span>
                       </div>
                       <div className="font-display font-bold text-base text-white">HEAVY BAG WORK</div>
-                      <div className="text-[11px] text-zinc-400">+1 Max STA &amp; +1 Stamina</div>
+                      <div className="text-[11px] text-zinc-400">+1 Max STA &amp; +1 Condition</div>
                     </button>
 
                     <button
@@ -791,6 +858,52 @@ export const FighterHub: React.FC<FighterHubProps> = ({
                       <div className="font-display font-bold text-base text-white">CORNER RECOVERY</div>
                       <div className="text-[11px] text-zinc-400">Restore 100% HP &amp; STA</div>
                     </button>
+                  </div>
+                </div>
+
+                {/* 14 Fight Skills Training Grid (9 Offense / 5 Defense · Cap 19,000) */}
+                <div className="bg-[#161920] rounded-xl comic-panel p-4">
+                  <div className="flex items-center justify-between mb-2.5">
+                    <div>
+                      <h2 className="font-display font-extrabold text-xl text-white">
+                        {t.fightSkillsTitle} (OFFENSE &amp; DEFENSE DRILLS)
+                      </h2>
+                      <p className="text-[11px] text-zinc-400">
+                        Each skill directly scales matching card DMG / DEF / Takedown &amp; Submission checks (20 XP per +5 pts)
+                      </p>
+                    </div>
+                    <span className="font-mono-num text-xs font-bold text-amber-300">
+                      {totalSkillPoints} / {MAX_SKILL_CAP.toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {ALL_SKILL_KEYS.map((sk) => {
+                      const meta = SKILL_LABELS[sk];
+                      const val = skills[sk] ?? 25;
+                      const isOff = meta.group === 'offense';
+                      return (
+                        <button
+                          key={sk}
+                          type="button"
+                          disabled={fighter.trainingXp < 20 || totalSkillPoints + 5 > MAX_SKILL_CAP}
+                          onClick={() => handleTrainSkill(sk)}
+                          className="text-left p-2 rounded-lg bg-[#101217] hover:bg-[#1c202a] disabled:opacity-45 border border-zinc-800 cursor-pointer"
+                        >
+                          <div className="flex items-center justify-between text-[10px]">
+                            <span className={`font-bold uppercase ${isOff ? 'text-red-400' : 'text-sky-400'}`}>
+                              {isOff ? 'OFF' : 'DEF'}
+                            </span>
+                            <span className="font-mono-num font-bold text-amber-300">+5 (20 XP)</span>
+                          </div>
+                          <div className="flex items-center justify-between mt-0.5">
+                            <span className="text-xs font-semibold text-white truncate">
+                              {lang === 'my' ? meta.my : meta.en}
+                            </span>
+                            <span className="font-mono-num font-bold text-xs text-emerald-400">{val}</span>
+                          </div>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 
@@ -852,6 +965,38 @@ export const FighterHub: React.FC<FighterHubProps> = ({
             {/* TAB 3: GAME PLAN */}
             {activeTab === 'deck' && (
               <>
+                {/* Positional Stance Radar Triangle Readout */}
+                <div className="bg-[#161920] rounded-xl comic-panel p-4">
+                  <div className="flex items-center justify-between gap-2 mb-2.5">
+                    <div className="flex items-center gap-2">
+                      <Triangle className="w-4 h-4 text-emerald-400" aria-hidden="true" />
+                      <h2 className="font-display font-extrabold text-lg text-white">
+                        {t.stanceRadarTitle} (DECK SYNERGY)
+                      </h2>
+                    </div>
+                    <span className="text-[11px] text-zinc-400">
+                      Higher zone score vs opponent grants +15%–30% effectiveness in ring
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    {(['Standing', 'Ground'] as const).map((stance) => (
+                      <div key={stance} className="p-2.5 rounded-lg bg-[#101217] border border-zinc-800">
+                        <div className="text-[11px] font-bold uppercase text-amber-300 mb-1.5">
+                          {stance} Triangle (Head / Body / Legs)
+                        </div>
+                        <div className="grid grid-cols-3 gap-2 text-center font-mono-num">
+                          {(['Head', 'Body', 'Legs'] as const).map((zone) => (
+                            <div key={zone} className="p-1.5 rounded bg-[#161922] border border-zinc-800">
+                              <div className="text-[10px] text-zinc-400 uppercase">{zone}</div>
+                              <div className="text-sm font-bold text-white">{stanceRadar[stance][zone]}</div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
                 <div className="bg-[#161920] rounded-xl comic-panel p-4">
                   <div className="flex items-center justify-between gap-3 mb-3">
                     <div>
@@ -868,7 +1013,14 @@ export const FighterHub: React.FC<FighterHubProps> = ({
                         </span>
                       </h2>
                       <p className="text-[11px] text-zinc-400">
-                        Avg {t.badgeSta}: <span className="font-mono-num text-sky-300">{deckAvgSta}</span> · Avg {t.badgeSpd}:{' '}
+                        <span className={deckStrikeCount < MIN_STRIKE_CARDS ? 'text-red-400 font-bold' : 'text-red-300'}>
+                          ATK {deckStrikeCount} (min {MIN_STRIKE_CARDS})
+                        </span>{' '}
+                        ·{' '}
+                        <span className={deckDefenseCount < MIN_DEFENSE_CARDS ? 'text-red-400 font-bold' : 'text-sky-300'}>
+                          DEF {deckDefenseCount} (min {MIN_DEFENSE_CARDS})
+                        </span>{' '}
+                        · Avg {t.badgeSta}: <span className="font-mono-num text-sky-300">{deckAvgSta}</span> · Avg {t.badgeSpd}:{' '}
                         <span className="font-mono-num text-emerald-300">{deckAvgSpd}</span>
                       </p>
                     </div>
@@ -882,7 +1034,7 @@ export const FighterHub: React.FC<FighterHubProps> = ({
                     </button>
                   </div>
 
-                  <div className="grid grid-cols-5 gap-2">
+                  <div className="grid grid-cols-4 gap-2">
                     {fighter.activeDeckIds.map((cardId, idx) => {
                       const card = getCardById(cardId, customCards);
                       if (!card) return null;
@@ -905,25 +1057,43 @@ export const FighterHub: React.FC<FighterHubProps> = ({
                 </div>
 
                 <div className="bg-[#161920] rounded-xl comic-panel p-4">
-                  <div className="flex items-center justify-between gap-3 mb-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
                     <h3 className="font-display font-bold text-xl text-white">
                       {t.unlockedLibrary}
                     </h3>
-                    <div className="flex items-center gap-1 p-1 bg-[#101217] rounded-lg border border-zinc-800">
-                      {(['All', 'Striking', 'Defense', 'Critical'] as const).map((cat) => (
-                        <button
-                          key={cat}
-                          type="button"
-                          onClick={() => setDeckFilter(cat)}
-                          className={`px-2.5 py-1 rounded text-xs font-bold cursor-pointer ${
-                            deckFilter === cat
-                              ? 'bg-red-600 text-white'
-                              : 'text-zinc-400 hover:text-white'
-                          }`}
-                        >
-                          {cat === 'All' ? t.allFilter : lang === 'my' ? CATEGORY_MY[cat] : cat}
-                        </button>
-                      ))}
+                    <div className="flex flex-wrap items-center gap-2">
+                      <div className="flex items-center gap-1 p-1 bg-[#101217] rounded-lg border border-zinc-800">
+                        {(['All', 'Striking', 'Defense', 'Critical'] as const).map((cat) => (
+                          <button
+                            key={cat}
+                            type="button"
+                            onClick={() => setDeckFilter(cat)}
+                            className={`px-2.5 py-1 rounded text-xs font-bold cursor-pointer ${
+                              deckFilter === cat
+                                ? 'bg-red-600 text-white'
+                                : 'text-zinc-400 hover:text-white'
+                            }`}
+                          >
+                            {cat === 'All' ? t.allFilter : lang === 'my' ? CATEGORY_MY[cat] : cat}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="flex items-center gap-1 p-1 bg-[#101217] rounded-lg border border-zinc-800">
+                        {(['All', 'Standing', 'Clinch', 'Ground'] as const).map((pos) => (
+                          <button
+                            key={pos}
+                            type="button"
+                            onClick={() => setPosFilter(pos)}
+                            className={`px-2 py-1 rounded text-xs font-bold cursor-pointer ${
+                              posFilter === pos
+                                ? 'bg-amber-500 text-black'
+                                : 'text-zinc-400 hover:text-white'
+                            }`}
+                          >
+                            {pos}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   </div>
 
@@ -962,6 +1132,22 @@ export const FighterHub: React.FC<FighterHubProps> = ({
           </div>
         </section>
       </div>
+
+      {pendingBout && (
+        <PreFightPlannerModal
+          fighter={fighter}
+          opponent={pendingBout.opponent}
+          mode={pendingBout.mode}
+          lang={lang}
+          onUpdateFighter={onUpdateFighter}
+          onClose={() => setPendingBout(null)}
+          onConfirmEnterRing={() => {
+            const { mode, opponent } = pendingBout;
+            setPendingBout(null);
+            onStartMatch(mode, opponent);
+          }}
+        />
+      )}
     </main>
   );
 };

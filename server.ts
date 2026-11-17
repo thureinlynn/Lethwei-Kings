@@ -82,20 +82,20 @@ async function startServer() {
       const response = await withGeminiRetry(() =>
         ai.models.generateContent({
         model: 'gemini-4-hydrogen',
-        contents: `Generate a complete standing martial arts fighter profile for the game "Lethwei Kings: Striking Federation".
+        contents: `Generate a complete martial arts fighter profile for the game "Lethwei Kings: Tactical MMA & Striking Federation".
 Theme / Inspiration: ${themePrompt}
 Role: ${role}
 
 Rules:
-- Strictly standing striking combatant (Lethwei, Muay Thai, Boxing, Kickboxing, or Karate). No ground fighting, BJJ, or submissions.
-- Allocate attribute stats (strength, speed, stamina, durability) each between 4 and 10, summing to roughly 25-29 total points.
+- Martial arts combatant skilled in Lethwei, Muay Thai, Boxing, Kickboxing, Karate, Wrestling, BJJ, or MMA.
+- Allocate attribute stats (strength, speed=Agility, stamina=Condition, durability=Health) each between 4 and 10, summing to roughly 25-29 total points.
 - Choose realistic skinTone hex from: #e2b48f, #c88d61, #a46943, #6e432b, #edd0b6.
 - Choose hairColor hex from: #18181b, #3f281d, #b91c1c, #eab308, #71717a.
 - Choose shortsColor hex from: #18181b, #b91c1c, #047857, #1d4ed8, #d97706.
 - Choose wrapColor hex from: #e7e0d3, #dc2626, #1d4ed8.`,
         config: {
           systemInstruction:
-            'You are a Myanmar Lethwei and international striking matchmaker generating balanced, authentic fighter profiles in strict JSON.',
+            'You are a Myanmar Lethwei and international MMA matchmaker generating balanced, authentic fighter profiles in strict JSON.',
           responseMimeType: 'application/json',
           responseSchema: {
             type: Type.OBJECT,
@@ -105,7 +105,7 @@ Rules:
               gender: { type: Type.STRING, enum: ['Male', 'Female'] },
               age: { type: Type.INTEGER, description: 'Age between 18 and 38' },
               birthplace: { type: Type.STRING, description: 'City and country, e.g. Hpa-An, Myanmar' },
-              styleLabel: { type: Type.STRING, description: 'Standing striking specialty label' },
+              styleLabel: { type: Type.STRING, description: 'Martial arts / MMA specialty label' },
               background: {
                 type: Type.STRING,
                 description: 'Concise 1-2 sentence combat background and fighting reputation',
@@ -183,7 +183,7 @@ Rules:
       const prompt =
         typeof req.body?.prompt === 'string' && req.body.prompt.trim().length > 0
           ? req.body.prompt.trim()
-          : 'A creative Myanmar Lethwei standing elbow or headbutt technique';
+          : 'A creative Myanmar Lethwei elbow, takedown, or MMA submission technique';
       const lang = req.body?.lang === 'my' ? 'my' : 'en';
 
       const ai = getGeminiClient();
@@ -191,20 +191,21 @@ Rules:
       const response = await withGeminiRetry(() =>
         ai.models.generateContent({
         model: 'gemini-4-hydrogen',
-        contents: `Design a balanced, legal Skill Card for "Lethwei Kings: Striking Federation" based on: "${prompt}".
+        contents: `Design a balanced, legal Skill Card for "Lethwei Kings: Tactical MMA & Striking Federation" based on: "${prompt}".
 
-STRICT MYANMAR LETHWEI GAMEPLAY CONSTRAINTS:
-- NO ground fighting, NO submissions, NO armbars, NO chokes, NO ground-and-pound.
-- ONLY standing combat: Punches, Kicks, Elbows, Knees, Headbutts, Standing Clinch, Standing Body Slam (resets distance), or Standing Defense/Counter.
+TACTICAL MMA & LETHWEI RULES:
+- Supports Standing, Clinch, and Ground combat: Punches, Kicks, Elbows, Knees, Headbutts, Clinch, Takedowns, Ground & Pound, Submissions, Sprawls, Hip Escapes, and Standing Defense/Counters.
 - Balancing rules:
-  * staCost: integer 0 to 4.
-  * power: for Striking, 4 to 15 (higher power must cost >= 2 STA and >= 2 SPD); for Defense, 4 to 11.
+  * tier: 'I' (basic), 'II' (advanced), or 'III' (elite finisher).
+  * position: 'Standing', 'Clinch', 'Ground', or 'Any'.
+  * staCost: integer 1 to 4.
+  * power: for Striking, 4 to 15 (higher power must cost >= 2 STA and >= 2 SPD); for Defense, 4 to 12.
   * speed: integer 1 to 5 (1 = fastest priority, 5 = heaviest/slowest).
   * description: punchy 1-line card text (under 75 chars).
 ${lang === 'my' ? '- LANGUAGE REQUIREMENT: Write the card "name" and "description" in natural Burmese (Myanmar Unicode script). Keep all enum fields in exact English schema values.' : ''}`,
         config: {
           systemInstruction:
-            'You are a lead combat designer for a 2D Turn-Based Myanmar Lethwei card game. Return strictly standing-combat-legal cards matching the exact JSON schema.',
+            'You are a lead combat designer for a 2D Turn-Based Lethwei & Tactical MMA card game. Return balanced cards matching the exact JSON schema.',
           responseMimeType: 'application/json',
           responseSchema: {
             type: Type.OBJECT,
@@ -212,11 +213,38 @@ ${lang === 'my' ? '- LANGUAGE REQUIREMENT: Write the card "name" and "descriptio
               name: { type: Type.STRING, description: 'Short vivid skill card title (2-4 words)' },
               discipline: {
                 type: Type.STRING,
-                enum: ['Lethwei', 'Muay Thai', 'Kickboxing', 'Boxing', 'Karate'],
+                enum: ['Lethwei', 'Muay Thai', 'Kickboxing', 'Boxing', 'Karate', 'Wrestling', 'BJJ', 'MMA'],
               },
               category: {
                 type: Type.STRING,
                 enum: ['Striking', 'Defense'],
+              },
+              tier: {
+                type: Type.STRING,
+                enum: ['I', 'II', 'III'],
+              },
+              position: {
+                type: Type.STRING,
+                enum: ['Standing', 'Clinch', 'Ground', 'Any'],
+              },
+              skillKey: {
+                type: Type.STRING,
+                enum: [
+                  'Punches',
+                  'Elbows',
+                  'Knees',
+                  'High_Kicks',
+                  'Low_Kicks',
+                  'Clinchwork',
+                  'Takedowns',
+                  'Ground_Grappling',
+                  'Submission',
+                  'Strike_Def',
+                  'Knees_Def',
+                  'Kick_Def',
+                  'Takedown_Def',
+                  'Submission_Def',
+                ],
               },
               staCost: { type: Type.INTEGER, description: 'Stamina cost 1 to 4' },
               power: { type: Type.INTEGER, description: 'DMG or DEF value between 4 and 15' },
@@ -229,20 +257,32 @@ ${lang === 'my' ? '- LANGUAGE REQUIREMENT: Write the card "name" and "descriptio
                 type: Type.STRING,
                 enum: [
                   'jab',
+                  'cross',
                   'hook',
                   'uppercut',
+                  'superman',
                   'roundhouse',
                   'sidekick',
+                  'teep',
                   'lowkick',
+                  'axekick',
                   'elbow',
+                  'upwardelbow',
                   'knee',
                   'headbutt',
                   'slam',
+                  'takedown',
+                  'groundpound',
+                  'submission',
+                  'escape',
                   'block',
                   'evade',
                   'sprawl',
                   'catchkick',
                   'parry',
+                  'shincheck',
+                  'shoulderroll',
+                  'longguard',
                 ],
               },
               specialEffect: {
@@ -257,6 +297,11 @@ ${lang === 'my' ? '- LANGUAGE REQUIREMENT: Write the card "name" and "descriptio
                   'anti_clinch',
                   'catch_kick',
                   'parry_counter',
+                  'takedown',
+                  'enter_clinch',
+                  'stand_up',
+                  'submission_lock',
+                  'submission_escape',
                 ],
               },
               description: { type: Type.STRING, description: 'Concise tactical effect text' },
@@ -265,6 +310,9 @@ ${lang === 'my' ? '- LANGUAGE REQUIREMENT: Write the card "name" and "descriptio
               'name',
               'discipline',
               'category',
+              'tier',
+              'position',
+              'skillKey',
               'staCost',
               'power',
               'speed',

@@ -75,6 +75,24 @@ export const DISCIPLINES: {
     origin: 'Okinawa / Japan',
     focus: 'Whip roundhouse kicks, side kicks & counter parries',
   },
+  {
+    id: 'Wrestling',
+    title: 'Freestyle Wrestling',
+    origin: 'Global',
+    focus: 'Explosive double/single-leg takedowns, sprawls & clinch slams',
+  },
+  {
+    id: 'BJJ',
+    title: 'Brazilian Jiu-Jitsu',
+    origin: 'Brazil',
+    focus: 'Guard passes, ground control, chokes & joint submissions',
+  },
+  {
+    id: 'MMA',
+    title: 'Mixed Martial Arts',
+    origin: 'Federation Unified',
+    focus: 'Seamless level changes, cage clinchwork & ground-and-pound',
+  },
 ];
 
 export const BIRTHPLACES = [

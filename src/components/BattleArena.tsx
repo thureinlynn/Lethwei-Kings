@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Camera,
   Coffee,
   Flame,
   Globe,
@@ -15,14 +16,19 @@ import {
 } from 'lucide-react';
 import { getCardById } from '../data/cards';
 import {
+  applyRoundRecovery,
   calculateEffectivePower,
   chooseAiAction,
   chooseAutoTimeoutAction,
   CombatantState,
+  computeStanceRadar,
+  createInitialSkills,
   CRITICAL_HP_THRESHOLD,
-  drawBattleHand,
+  drawBattleHandForRole,
   evaluateMatchOutcome,
-  getAvailableCriticalCards,
+  getAvailableCriticalCardsForRole,
+  getTriangleDominanceBonus,
+  getTurnRole,
   mapCardToFighterPose,
   MAX_ROUNDS,
   resolveTurn,
@@ -31,7 +37,9 @@ import {
 } from '../game/rules';
 import { localizeCard, UI_TEXT } from '../i18n/translations';
 import {
+  CameraAngle,
   CombatCard as CombatCardType,
+  CombatPosition,
   FighterPose,
   FighterProfile,
   FloatingPopup,
@@ -83,7 +91,25 @@ export const BattleArena: React.FC<BattleArenaProps> = ({
   const [turnSecondsLeft, setTurnSecondsLeft] = useState<number>(TURN_TIMER_SECONDS);
   const [muted, setMuted] = useState(soundEngine.muted);
 
-  const customCards = fighter.customCards ?? [];
+  const customCards = useMemo(() => fighter.customCards ?? [], [fighter.customCards]);
+  const playerSkills = useMemo(
+    () => fighter.skills ?? createInitialSkills(fighter.gymId),
+    [fighter.skills, fighter.gymId]
+  );
+  const aiSkills = useMemo(
+    () => opponent.skills ?? createInitialSkills(),
+    [opponent.skills]
+  );
+  const playerRadar = useMemo(
+    () => computeStanceRadar(fighter.activeDeckIds, customCards),
+    [fighter.activeDeckIds, customCards]
+  );
+  const aiRadar = useMemo(
+    () => computeStanceRadar(opponent.deckIds, []),
+    [opponent.deckIds]
+  );
+
+  const [position, setPosition] = useState<CombatPosition>('Standing');
 
   const [playerState, setPlayerState] = useState<CombatantState>({
     hp: fighter.maxHp,
@@ -92,6 +118,8 @@ export const BattleArena: React.FC<BattleArenaProps> = ({
     maxSta: fighter.maxSta,
     bleedTurns: 0,
     slowPenalty: 0,
+    agilityPenalty: 0,
+    submissionPct: 0,
     maniUsed: false,
     totalDamageDealt: 0,
     strikesLanded: 0,
@@ -105,17 +133,33 @@ export const BattleArena: React.FC<BattleArenaProps> = ({
     maxSta: opponent.maxSta,
     bleedTurns: 0,
     slowPenalty: 0,
+    agilityPenalty: 0,
+    submissionPct: 0,
     maniUsed: false,
     totalDamageDealt: 0,
     strikesLanded: 0,
     headbuttsLanded: 0,
   });
 
+  const [cameraAngle, setCameraAngle] = useState<CameraAngle>('auto');
+  const [clashCameraCue, setClashCameraCue] = useState<'side' | 'corner' | 'high' | 'cover'>('side');
+
+  const turnRole = getTurnRole(round, turn);
+
   const [playerHandIds, setPlayerHandIds] = useState<string[]>(() =>
-    drawBattleHand(fighter.activeDeckIds, 5)
+    drawBattleHandForRole(
+      fighter.activeDeckIds,
+      getTurnRole(1, 1),
+      'player',
+      5,
+      fighter.unlockedCardIds,
+      customCards,
+      Math.random,
+      'Standing'
+    )
   );
   const [aiHandIds, setAiHandIds] = useState<string[]>(() =>
-    drawBattleHand(opponent.deckIds, 5)
+    drawBattleHandForRole(opponent.deckIds, getTurnRole(1, 1), 'ai', 5, [], [], Math.random, 'Standing')
   );
 
   const [selectedPlayerChoice, setSelectedPlayerChoice] = useState<
@@ -178,8 +222,8 @@ export const BattleArena: React.FC<BattleArenaProps> = ({
   }, []);
 
   const criticalCards = useMemo(
-    () => getAvailableCriticalCards(playerState),
-    [playerState]
+    () => getAvailableCriticalCardsForRole(playerState, turnRole, 'player'),
+    [playerState, turnRole]
   );
 
   const isPlayerCritical =
@@ -246,31 +290,61 @@ export const BattleArena: React.FC<BattleArenaProps> = ({
     clearAllTimers();
     soundEngine.playClick();
 
-    const aiPick = chooseAiAction(aiHandIds, aiState);
+    const aiPick = chooseAiAction(
+      aiHandIds,
+      aiState,
+      Math.random,
+      turnRole,
+      customCards,
+      position
+    );
     setSelectedPlayerChoice(choice);
     setSelectedAiChoice(aiPick);
     setPhase('clashing');
-    setBannerText('CLASH!');
+    setBannerText(turnRole === 'player_attack' ? 'RED ATTACKS!' : 'BLUE ATTACKS!');
 
     const resolution = resolveTurn({
       roundNumber: round,
       turnNumber: turn,
+      position,
       playerChoice: choice,
       aiChoice: aiPick,
       playerState,
       aiState,
       playerStats: fighter.stats,
       aiStats: opponent.stats,
+      playerSkills,
+      aiSkills,
+      playerRadar,
+      aiRadar,
       playerGymId: fighter.gymId,
     });
 
     const pNext = { ...resolution.nextPlayerState };
     const aNext = { ...resolution.nextAiState };
+    const nextPos = resolution.summary.positionAfter;
     const steps = resolution.summary.steps;
 
     const applyStepVisuals = (step: TurnExchangeStep, idx: number) => {
       const attackerIsPlayer = step.actor === 'player';
       setAnimStepKey((k) => k + 1);
+
+      // Auto-cinematic camera cue shifts to Cover close-up on heavy strikes/ground/submissions
+      if (
+        step.isHeavy ||
+        step.actorPose === 'headbutt' ||
+        step.actorPose === 'elbow' ||
+        step.actorPose === 'takedown' ||
+        step.actorPose === 'groundpound' ||
+        step.actorPose === 'submission' ||
+        step.defenderPose === 'ko'
+      ) {
+        setClashCameraCue('cover');
+      } else if (step.actorPose === 'kick' || step.actorPose === 'knee') {
+        setClashCameraCue('high');
+      } else {
+        setClashCameraCue('corner');
+      }
 
       if (attackerIsPlayer) {
         setPlayerPose(step.actorPose);
@@ -305,17 +379,20 @@ export const BattleArena: React.FC<BattleArenaProps> = ({
       setShakeLevel('none');
       setImpactFlash('none');
       setPopups([]);
+      setPosition(nextPos);
 
       const outcome = evaluateMatchOutcome(pNext, aNext, round, turn);
       if (outcome.finished && outcome.winner && outcome.winner !== 'draw') {
         const isKo = aNext.hp <= 0 || pNext.hp <= 0;
+        const isSub = aNext.submissionPct >= 100 || pNext.submissionPct >= 100;
         soundEngine.playBell(3);
         const xpBase = mode === 'sparring' ? 35 : mode === 'local' ? 55 : 100;
         const xpEarned =
           outcome.winner === 'player'
-            ? xpBase + (isKo ? 15 : 0)
+            ? xpBase + (isKo || isSub ? 15 : 0)
             : Math.round(xpBase * 0.4);
 
+        setClashCameraCue('cover');
         setPlayerPose(outcome.winner === 'player' ? 'victory' : 'ko');
         setAiPose(outcome.winner === 'ai' ? 'victory' : 'ko');
         setBannerText(outcome.method.toUpperCase());
@@ -342,34 +419,64 @@ export const BattleArena: React.FC<BattleArenaProps> = ({
       setSelectedPlayerChoice(null);
       setSelectedAiChoice(null);
 
+      let nextRoundNum = round;
+      let nextTurnNum = turn + 1;
+
       if (turn >= TURNS_PER_ROUND) {
-        const nextRound = round + 1;
+        nextRoundNum = round + 1;
+        nextTurnNum = 1;
         soundEngine.playBell(1);
-        setPlayerState((prev) => ({
-          ...prev,
-          sta: Math.min(prev.maxSta, prev.sta + 3),
-          hp: Math.min(prev.maxHp, prev.hp + 2),
-        }));
-        setAiState((prev) => ({
-          ...prev,
-          sta: Math.min(prev.maxSta, prev.sta + 3),
-          hp: Math.min(prev.maxHp, prev.hp + 2),
-        }));
-        setRound(nextRound);
-        setTurn(1);
-        setBannerText(`ROUND ${nextRound} · CORNER RECOVERY (+3 STA)`);
+        const pRecovered = applyRoundRecovery(pNext, fighter.stats);
+        const aRecovered = applyRoundRecovery(aNext, opponent.stats);
+        setPlayerState(pRecovered);
+        setAiState(aRecovered);
+        setRound(nextRoundNum);
+        setTurn(nextTurnNum);
+        setClashCameraCue('high');
+        setBannerText(
+          `ROUND ${nextRoundNum} · CORNER RECOVERY (+${Math.max(0, pRecovered.sta - pNext.sta)} STA)`
+        );
       } else {
-        setTurn((tv) => tv + 1);
-        setBannerText(`TURN ${turn + 1} · CHOOSE YOUR MOVE`);
+        setTurn(nextTurnNum);
+        const nextRole = getTurnRole(nextRoundNum, nextTurnNum);
+        setClashCameraCue(nextRole === 'ai_attack' ? 'corner' : 'side');
+        setBannerText(
+          nextRole === 'player_attack'
+            ? `TURN ${nextTurnNum} · YOUR ATTACK`
+            : `TURN ${nextTurnNum} · DEFEND`
+        );
       }
 
-      setPlayerHandIds(drawBattleHand(fighter.activeDeckIds, 5));
-      setAiHandIds(drawBattleHand(opponent.deckIds, 5));
+      const nextRole = getTurnRole(nextRoundNum, nextTurnNum);
+      setPlayerHandIds(
+        drawBattleHandForRole(
+          fighter.activeDeckIds,
+          nextRole,
+          'player',
+          5,
+          fighter.unlockedCardIds,
+          customCards,
+          Math.random,
+          nextPos
+        )
+      );
+      setAiHandIds(
+        drawBattleHandForRole(
+          opponent.deckIds,
+          nextRole,
+          'ai',
+          5,
+          [],
+          [],
+          Math.random,
+          nextPos
+        )
+      );
       setTurnSecondsLeft(TURN_TIMER_SECONDS);
       setPhase('selecting');
     };
 
-    // Step 2 -> Step 3 (after 380ms card lock-in showcase)
+    // Step 2 -> Step 3 (brief 260ms top-strip lock-in without blocking fighters -> full slow 1160ms attack animation)
     const tClash = window.setTimeout(() => {
       setPhase('resolving');
       setLastSummary(resolution.summary);
@@ -381,34 +488,34 @@ export const BattleArena: React.FC<BattleArenaProps> = ({
         setAiState(aNext);
         spawnSupportPopups(resolution.summary);
         soundEngine.playEvade();
-        const tDone = window.setTimeout(finalizeTurn, 520);
+        const tDone = window.setTimeout(finalizeTurn, 980);
         timersRef.current.push(tDone);
         return;
       }
 
-      // Step 3A: First Mover Attack + Defender Reaction
+      // Step 3A: Attack + Defender Reaction (1160ms full visibility window)
       applyStepVisuals(steps[0], 0);
       if (steps.length === 1) {
         setPlayerState(pNext);
         setAiState(aNext);
-        const tDone = window.setTimeout(finalizeTurn, 620);
+        const tDone = window.setTimeout(finalizeTurn, 1160);
         timersRef.current.push(tDone);
         return;
       }
 
-      // Step 3B: Second Mover Attack + Defender Reaction (if not KO'd)
+      // Step 3B: Second Mover Attack + Defender Reaction
       const tSecond = window.setTimeout(() => {
         setShakeLevel('none');
         setImpactFlash('none');
         applyStepVisuals(steps[1], 1);
         setPlayerState(pNext);
         setAiState(aNext);
-        const tDone = window.setTimeout(finalizeTurn, 620);
+        const tDone = window.setTimeout(finalizeTurn, 1160);
         timersRef.current.push(tDone);
-      }, 580);
+      }, 1160);
 
       timersRef.current.push(tSecond);
-    }, 380);
+    }, 260);
 
     timersRef.current.push(tClash);
   };
@@ -418,7 +525,13 @@ export const BattleArena: React.FC<BattleArenaProps> = ({
   useEffect(() => {
     autoTimeoutActionRef.current = () => {
       if (phase !== 'selecting') return;
-      const autoPick = chooseAutoTimeoutAction(playerHandIds, playerState, customCards);
+      const desiredCategory = turnRole === 'player_attack' ? 'Striking' : 'Defense';
+      const autoPick = chooseAutoTimeoutAction(
+        playerHandIds,
+        playerState,
+        customCards,
+        desiredCategory
+      );
       handleSelectAction(autoPick);
     };
   });
@@ -470,6 +583,16 @@ export const BattleArena: React.FC<BattleArenaProps> = ({
       : `SPD ${pSpd} TIE · STAT SPEED DECIDES`;
   };
 
+  const activeCameraView = cameraAngle === 'auto' ? clashCameraCue : cameraAngle;
+  const cameraTransform =
+    activeCameraView === 'cover'
+      ? 'perspective(820px) rotateY(5deg) scale(1.18) translate3d(0, -12px, 0)'
+      : activeCameraView === 'corner'
+      ? 'perspective(880px) rotateY(-8deg) rotateZ(-0.6deg) scale(1.11) translate3d(-18px, -4px, 0)'
+      : activeCameraView === 'high'
+      ? 'perspective(860px) rotateX(12deg) scale(1.08) translate3d(0, 14px, 0)'
+      : 'scale(1) translate3d(0, 0, 0)';
+
   return (
     <main
       className={`h-screen w-screen overflow-hidden bg-[#0c0d11] text-[#f5f2eb] flex flex-col justify-between select-none ${
@@ -481,7 +604,7 @@ export const BattleArena: React.FC<BattleArenaProps> = ({
       }`}
     >
       {/* ================= TOP HUD (Compact Landscape Header) ================= */}
-      <header className="shrink-0 bg-[#14161d] border-b-2 border-[#090a0c] px-4 sm:px-6 py-2">
+      <header className="shrink-0 bg-[#14161d] border-b-2 border-[#090a0c] px-4 sm:px-6 py-1.5">
         <div className="max-w-7xl mx-auto grid grid-cols-12 gap-3 items-center">
           {/* LEFT: Player Portrait + Red HP + Blue STA */}
           <div className="col-span-5 flex items-center gap-2.5">
@@ -629,23 +752,90 @@ export const BattleArena: React.FC<BattleArenaProps> = ({
         </div>
       </header>
 
-      {/* ================= CENTER RING STAGE (Flex-1, Matches Image 2 Style) ================= */}
-      <section className="flex-1 min-h-0 max-w-7xl w-full mx-auto px-4 sm:px-6 py-2 flex flex-col gap-1.5">
+      {/* ================= CENTER RING STAGE (Flex-1, Dynamic Camera Angles & Ring Activities) ================= */}
+      <section className="flex-1 min-h-0 max-w-7xl w-full mx-auto px-4 sm:px-6 py-1.5 flex flex-col gap-1">
+        {/* Stage Status + Alternating Role Badge + Camera Angle Selector */}
         <div className="shrink-0 flex items-center justify-between text-xs text-zinc-400 gap-2">
-          <span className="truncate">
-            {mode === 'sparring'
-              ? 'Gym Sparring · Standing Rules Only'
-              : mode === 'local'
-              ? 'Local Promotion · Official Bout'
-              : 'World Championship · Golden Belt'}
-            {opponent.isAiGenerated ? ` · AI Challenger (${opponent.styleLabel})` : ''}
-          </span>
-          <span className="font-medium text-amber-200/90 hidden md:inline truncate">
-            {phase === 'selecting' ? t.waitingStanceHint : ''}
-          </span>
-          <span className="font-display font-bold text-sm tracking-wider text-amber-400 shrink-0 flex items-center gap-2">
+          <div className="flex items-center gap-2 min-w-0">
             <span
-              className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-zinc-900 border border-zinc-700 ${
+              data-testid="turn-role-badge"
+              className={`px-2 py-0.5 rounded font-display font-extrabold text-xs tracking-wider border shrink-0 flex items-center gap-1 ${
+                turnRole === 'player_attack'
+                  ? 'bg-red-700/90 border-red-400 text-white'
+                  : 'bg-sky-700/90 border-sky-400 text-white'
+              }`}
+            >
+              {turnRole === 'player_attack' ? (
+                <Swords className="w-3 h-3" aria-hidden="true" />
+              ) : (
+                <Shield className="w-3 h-3" aria-hidden="true" />
+              )}
+              <span>{turnRole === 'player_attack' ? t.attackRoleBadge : t.defenseRoleBadge}</span>
+            </span>
+            <span
+              data-testid="combat-position-badge"
+              className={`px-2 py-0.5 rounded font-display font-extrabold text-xs tracking-wider border shrink-0 uppercase ${
+                position === 'Ground'
+                  ? 'bg-purple-800/90 border-purple-400 text-purple-100'
+                  : position === 'Clinch'
+                  ? 'bg-amber-700/90 border-amber-400 text-amber-100'
+                  : 'bg-zinc-800 border-zinc-600 text-zinc-200'
+              }`}
+            >
+              POS: {position}
+            </span>
+            {(playerState.submissionPct > 0 || aiState.submissionPct > 0) && (
+              <span
+                data-testid="submission-lock-badge"
+                className="px-2 py-0.5 rounded font-mono-num font-bold text-[11px] bg-rose-900/90 border border-rose-400 text-rose-100 shrink-0"
+              >
+                SUB LOCK {aiState.submissionPct > 0 ? `BLUE ${aiState.submissionPct}%` : `RED ${playerState.submissionPct}%`}
+              </span>
+            )}
+            <span className="truncate text-[11px] hidden xl:inline">
+              {mode === 'sparring'
+                ? 'Gym Sparring · Tactical MMA'
+                : mode === 'local'
+                ? 'Local Promotion · Official'
+                : 'World Championship'}
+            </span>
+          </div>
+
+          {/* Camera Angle Switcher */}
+          <div className="flex items-center gap-1 bg-[#141720] px-1.5 py-0.5 rounded-md border border-zinc-800 shrink-0">
+            <Camera className="w-3 h-3 text-amber-400 mr-0.5" aria-hidden="true" />
+            <span className="text-[10px] font-bold text-zinc-400 mr-0.5">{t.cameraLabel}:</span>
+            {(
+              [
+                { id: 'auto', label: t.camAuto },
+                { id: 'side', label: t.camSide },
+                { id: 'corner', label: t.camCorner },
+                { id: 'high', label: t.camHigh },
+                { id: 'cover', label: t.camCover },
+              ] as const
+            ).map((cam) => (
+              <button
+                key={cam.id}
+                type="button"
+                aria-pressed={cameraAngle === cam.id}
+                onClick={() => {
+                  soundEngine.playClick();
+                  setCameraAngle(cam.id);
+                }}
+                className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase cursor-pointer transition-colors ${
+                  cameraAngle === cam.id
+                    ? 'bg-amber-500 text-black'
+                    : 'text-zinc-300 hover:bg-zinc-800'
+                }`}
+              >
+                {cam.label}
+              </button>
+            ))}
+          </div>
+
+          <span className="font-display font-bold text-xs sm:text-sm tracking-wider text-amber-400 shrink-0 flex items-center gap-1.5">
+            <span
+              className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-zinc-900 border border-zinc-700 ${
                 playerState.maniUsed
                   ? 'text-zinc-500'
                   : isPlayerCritical
@@ -659,11 +849,16 @@ export const BattleArena: React.FC<BattleArenaProps> = ({
           </span>
         </div>
 
-        {/* Stadium Fighting Stage (Perspective Overhead Trusses, Arena Crowd, City Glow, 4-Rope Corner Posts, Referee, Nine Limbs Mat) */}
+        {/* Stadium Fighting Stage (Camera Perspective Wrapper keeps fighters unobstructed!) */}
         <div
           data-testid="battle-ring"
+          data-camera={activeCameraView}
           className="relative flex-1 min-h-0 w-full rounded-xl comic-panel overflow-hidden bg-[#07090d]"
         >
+          <div
+            className="relative w-full h-full transition-transform duration-700 ease-out origin-center will-change-transform"
+            style={{ transform: cameraTransform }}
+          >
           <svg
             viewBox="0 0 1200 400"
             preserveAspectRatio="xMidYMid slice"
@@ -801,6 +996,10 @@ export const BattleArena: React.FC<BattleArenaProps> = ({
               </g>
             ))}
 
+            {/* Animated Ringside Crowd Camera Flashes */}
+            <circle cx="132" cy="242" r="14" fill="#ffffff" className="anim-crowd-flash-a" />
+            <circle cx="998" cy="238" r="12" fill="#fef3c7" className="anim-crowd-flash-b" />
+
             {/* Ring Canvas Perspective Mat + Center "NINE LIMBS · LETHWEI" Graphic */}
             <polygon
               points="265,246 890,246 1200,320 1200,400 0,400 0,342"
@@ -812,7 +1011,6 @@ export const BattleArena: React.FC<BattleArenaProps> = ({
               points="265,246 890,246 1200,320 1200,400 0,400 0,342"
               fill="url(#matCenterPool)"
             />
-            {/* Apron dark edge drop */}
             <polygon points="0,392 1200,392 1200,400 0,400" fill="#090a0c" />
 
             {/* Golden Angled Mat Branding ("NINE LIMBS · LETHWEI") */}
@@ -844,21 +1042,48 @@ export const BattleArena: React.FC<BattleArenaProps> = ({
               </text>
             </g>
 
-            {/* Center Referee Watching the Action (Black Shirt, White Gloves) */}
-            <g transform="translate(566, 152)" opacity="0.96">
-              <ellipse cx="34" cy="126" rx="24" ry="5" fill="#06070a" opacity="0.55" />
-              <path d="M 22 72 L 18 124 L 28 124 L 33 84 L 39 124 L 49 124 L 45 72 Z" fill="#181b22" stroke="#090a0c" strokeWidth="2.4" strokeLinejoin="round" />
-              <path d="M 18 28 L 50 28 L 46 74 L 22 74 Z" fill="#1e222b" stroke="#090a0c" strokeWidth="2.5" strokeLinejoin="round" />
-              <path d="M 28 28 L 34 38 L 40 28" fill="none" stroke="#fbbf24" strokeWidth="2" />
-              {/* Referee Raised Hands */}
-              <path d="M 20 34 L 11 54 L 18 58 L 24 42" fill="#1e222b" stroke="#090a0c" strokeWidth="2" />
-              <circle cx="15" cy="58" r="4.5" fill="#e5e7eb" stroke="#090a0c" strokeWidth="1.8" />
-              <path d="M 48 34 L 57 54 L 50 58 L 44 42" fill="#1e222b" stroke="#090a0c" strokeWidth="2" />
-              <circle cx="53" cy="58" r="4.5" fill="#e5e7eb" stroke="#090a0c" strokeWidth="1.8" />
-              {/* Referee Head */}
+            {/* Animated Center Referee Watching & Reacting to Clashes */}
+            <g
+              className={phase === 'selecting' ? 'anim-referee-sway' : undefined}
+              transform={
+                phase === 'finished'
+                  ? 'translate(566, 146) scale(1.05)'
+                  : phase === 'resolving' || phase === 'clashing'
+                  ? 'translate(566, 150) rotate(3 34 60)'
+                  : 'translate(566, 152)'
+              }
+              opacity="0.96"
+            >
+              <ellipse cx="34" cy="126" rx="25" ry="5.5" fill="#06070a" opacity="0.58" />
+              <path d="M 22 72 L 17 124 L 28 124 L 33 84 L 40 124 L 50 124 L 45 72 Z" fill="#181b22" stroke="#090a0c" strokeWidth="2.4" strokeLinejoin="round" />
+              <path d="M 26 84 L 24 114 M 42 84 L 44 114" stroke="#334155" strokeWidth="1.2" opacity="0.6" />
+              {/* Collared Referee Shirt & Belt */}
+              <path d="M 17 28 L 51 28 L 46 73 L 22 73 Z" fill="#1f2530" stroke="#090a0c" strokeWidth="2.5" strokeLinejoin="round" />
+              <rect x="21" y="68" width="26" height="5" fill="#090a0c" />
+              <rect x="31" y="68" width="6" height="5" fill="#d97706" />
+              <path d="M 26 28 L 34 39 L 42 28" fill="#0f172a" stroke="#fbbf24" strokeWidth="1.8" strokeLinejoin="round" />
+              <path d="M 34 39 L 34 68" stroke="#090a0c" strokeWidth="1.4" opacity="0.6" />
+              <path
+                d={phase === 'finished' ? 'M 20 34 L 7 16 L 15 12 L 24 38' : 'M 20 34 L 10 54 L 17 58 L 24 42'}
+                fill="#1f2530"
+                stroke="#090a0c"
+                strokeWidth="2.1"
+              />
+              <circle cx={phase === 'finished' ? 11 : 14} cy={phase === 'finished' ? 13 : 58} r="4.5" fill="#e5e7eb" stroke="#090a0c" strokeWidth="1.8" />
+              <path
+                d={phase === 'finished' ? 'M 48 34 L 61 16 L 53 12 L 44 38' : 'M 48 34 L 58 54 L 51 58 L 44 42'}
+                fill="#1f2530"
+                stroke="#090a0c"
+                strokeWidth="2.1"
+              />
+              <circle cx={phase === 'finished' ? 57 : 54} cy={phase === 'finished' ? 13 : 58} r="4.5" fill="#e5e7eb" stroke="#090a0c" strokeWidth="1.8" />
               <rect x="29" y="18" width="10" height="10" fill="#a86d48" stroke="#090a0c" strokeWidth="2" />
-              <path d="M 24 9 C 24 0, 44 0, 44 9 L 44 17 C 44 23, 39 26, 34 26 C 29 26, 24 23, 24 17 Z" fill="#c88d61" stroke="#090a0c" strokeWidth="2.4" />
-              <path d="M 24 9 C 24 0, 44 0, 44 9 C 39 6, 29 6, 24 9 Z" fill="#18181b" stroke="#090a0c" strokeWidth="1.8" />
+              <path d="M 24 9 C 24 -1, 44 -1, 44 9 L 44 17 C 44 23, 39 26, 34 26 C 29 26, 24 23, 24 17 Z" fill="#c88d61" stroke="#090a0c" strokeWidth="2.4" />
+              <path d="M 24 9 C 24 0, 44 0, 44 9 C 39 5.5, 29 5.5, 24 9 Z" fill="#18181b" stroke="#090a0c" strokeWidth="1.8" />
+              <path d="M 28 13 L 32 13.5 M 36 13.5 L 40 13" stroke="#090a0c" strokeWidth="1.6" strokeLinecap="round" />
+              <circle cx="30" cy="15.5" r="1.1" fill="#090a0c" />
+              <circle cx="38" cy="15.5" r="1.1" fill="#090a0c" />
+              <path d="M 31 21 L 37 21" stroke="#090a0c" strokeWidth="1.4" strokeLinecap="round" />
             </g>
 
             {/* Perspective Rear Ropes Behind Fighters */}
@@ -922,6 +1147,7 @@ export const BattleArena: React.FC<BattleArenaProps> = ({
                 gender={fighter.gender}
                 appearance={fighter.appearance}
                 pose={playerPose}
+                position={position}
                 animKey={animStepKey}
                 isRhythm={phase === 'selecting'}
                 facing="right"
@@ -950,6 +1176,16 @@ export const BattleArena: React.FC<BattleArenaProps> = ({
                 ))}
             </div>
 
+            {/* Center Impact Starburst Flash on Hit */}
+            {impactFlash !== 'none' && (
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute left-1/2 top-[34%] -translate-x-1/2 -translate-y-1/2 z-20"
+              >
+                <div className="w-16 h-16 rounded-full border-4 border-amber-300/80 animate-ping" />
+              </div>
+            )}
+
             {/* Opponent Sprite */}
             <div
               data-testid="opponent-sprite"
@@ -963,6 +1199,7 @@ export const BattleArena: React.FC<BattleArenaProps> = ({
                 gender={opponent.gender}
                 appearance={opponent.appearance}
                 pose={aiPose}
+                position={position}
                 animKey={animStepKey}
                 isRhythm={phase === 'selecting'}
                 facing="left"
@@ -993,77 +1230,46 @@ export const BattleArena: React.FC<BattleArenaProps> = ({
                 ))}
             </div>
           </div>
+          </div>
 
-          {/* Step 2: Middle Clash Card Lock-In Overlay (clears away during Step 3 action animation) */}
-          {phase === 'clashing' && (selectedPlayerChoice || selectedAiChoice) && (
-            <div className="absolute inset-0 z-20 bg-black/60 flex flex-col items-center justify-center p-2">
+          {activeCameraView === 'cover' && (
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0 shadow-[inset_0_0_90px_rgba(0,0,0,0.75)]"
+            />
+          )}
+
+          {/* Non-Blocking Top-Center Clash Pill (NEVER obscures fighters during clash or attack animation!) */}
+          {(phase === 'clashing' || phase === 'resolving') && (selectedPlayerChoice || selectedAiChoice) && (
+            <div className="absolute top-2 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-1 pointer-events-none">
+              <div className="flex items-center gap-2 px-3 py-1 rounded-lg bg-[#0d1016]/90 border border-amber-500/70 shadow-lg backdrop-blur-xs">
+                <span className="text-[11px] font-bold text-red-300 truncate max-w-[160px]">
+                  {selectedPlayerChoice === 'REST'
+                    ? 'REST (+4 STA)'
+                    : selectedPlayerChoice
+                    ? localizeCard(selectedPlayerChoice, lang).name
+                    : ''}
+                </span>
+                <span className="font-display font-extrabold italic text-xs text-amber-400">VS</span>
+                <span className="text-[11px] font-bold text-sky-300 truncate max-w-[160px]">
+                  {selectedAiChoice === 'REST'
+                    ? 'REST (+4 STA)'
+                    : selectedAiChoice
+                    ? localizeCard(selectedAiChoice, lang).name
+                    : ''}
+                </span>
+              </div>
               {renderSpeedAdvantage() && (
-                <div className="mb-1.5 px-3 py-0.5 rounded bg-amber-500 text-black font-display font-extrabold text-xs tracking-wider comic-panel-sm">
+                <div className="px-2.5 py-0.5 rounded bg-amber-500/95 text-black font-display font-extrabold text-[11px] tracking-wider comic-panel-sm">
                   {renderSpeedAdvantage()}
                 </div>
               )}
-              <div className="flex items-center justify-center gap-6">
-                <div className="w-36">
-                  <div className="text-[10px] font-bold uppercase text-center text-sky-300 mb-0.5">
-                    {t.yourMove}
-                  </div>
-                  {selectedPlayerChoice === 'REST' ? (
-                    <div className="p-3 rounded-lg bg-[#20232b] comic-panel text-center">
-                      <Coffee className="w-6 h-6 text-sky-400 mx-auto mb-1" />
-                      <div className="font-display font-bold text-base text-white">REST</div>
-                      <div className="text-[11px] text-sky-300">+4 {t.badgeSta}</div>
-                    </div>
-                  ) : selectedPlayerChoice ? (
-                    <CombatCard
-                      card={selectedPlayerChoice}
-                      effectivePower={calculateEffectivePower(
-                        selectedPlayerChoice,
-                        fighter.stats,
-                        fighter.gymId
-                      )}
-                      compact
-                      lang={lang}
-                    />
-                  ) : null}
-                </div>
-
-                <div className="font-display font-extrabold italic text-2xl text-red-500 comic-text-stroke">
-                  VS
-                </div>
-
-                <div className="w-36">
-                  <div className="text-[10px] font-bold uppercase text-center text-red-300 mb-0.5">
-                    {t.opponentMove}
-                  </div>
-                  {selectedAiChoice === 'REST' ? (
-                    <div className="p-3 rounded-lg bg-[#20232b] comic-panel text-center">
-                      <Coffee className="w-6 h-6 text-sky-400 mx-auto mb-1" />
-                      <div className="font-display font-bold text-base text-white">REST</div>
-                      <div className="text-[11px] text-sky-300">+4 {t.badgeSta}</div>
-                    </div>
-                  ) : selectedAiChoice ? (
-                    <CombatCard
-                      card={selectedAiChoice}
-                      effectivePower={calculateEffectivePower(selectedAiChoice, opponent.stats)}
-                      compact
-                      lang={lang}
-                    />
-                  ) : null}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Step 3: Compact top-center speed priority pill while animated strikes play out cleanly */}
-          {phase === 'resolving' && renderSpeedAdvantage() && (
-            <div className="absolute top-2.5 left-1/2 -translate-x-1/2 z-20 px-3 py-0.5 rounded bg-amber-500/95 text-black font-display font-extrabold text-xs tracking-wider comic-panel-sm pointer-events-none">
-              {renderSpeedAdvantage()}
             </div>
           )}
         </div>
 
         {/* Last Turn Combat Feed Strip */}
-        <div className="shrink-0 bg-[#151820] rounded-lg border border-zinc-800 px-3 py-1.5 text-xs text-zinc-200 truncate">
+        <div className="shrink-0 bg-[#151820] rounded-lg border border-zinc-800 px-3 py-1 text-xs text-zinc-200 truncate">
           {lastSummary ? (
             <>
               <span className="font-bold text-amber-400 mr-2">
@@ -1078,18 +1284,18 @@ export const BattleArena: React.FC<BattleArenaProps> = ({
               <span>{lastSummary.logs.join(' ')}</span>
             </>
           ) : (
-            <span className="text-zinc-400">
-              {t.waitingStanceHint}
+            <span className="text-zinc-300 font-medium">
+              {turnRole === 'player_attack' ? t.attackTurnBanner : t.defenseTurnBanner} · {t.waitingStanceHint}
             </span>
           )}
         </div>
       </section>
 
       {/* ================= BOTTOM CARD HAND & REST / CRITICAL TRAY ================= */}
-      <footer className="shrink-0 bg-[#12141a] border-t-2 border-[#090a0c] px-4 sm:px-6 py-2">
-        <div className="max-w-7xl mx-auto space-y-1.5">
+      <footer className="shrink-0 bg-[#12141a] border-t-2 border-[#090a0c] px-4 sm:px-6 py-1.5">
+        <div className="max-w-7xl mx-auto space-y-1">
           {isPlayerCritical && criticalCards.length > 0 && (
-            <div className="px-2.5 py-1.5 rounded-lg bg-red-950/60 border border-amber-500 flex items-center gap-3">
+            <div className="px-2.5 py-1 rounded-lg bg-red-950/60 border border-amber-500 flex items-center gap-3">
               <div className="flex items-center gap-1.5 shrink-0">
                 <Flame className="w-4 h-4 text-amber-400" aria-hidden="true" />
                 <span className="font-display font-extrabold text-sm text-amber-300">
@@ -1117,18 +1323,31 @@ export const BattleArena: React.FC<BattleArenaProps> = ({
             </div>
           )}
 
-          {/* 5 Drawn Cards + REST / RECOVER STA Button */}
+          {/* 5 Role-Filtered Cards (Attack on Odd Turns, Defense on Even Turns) + REST */}
           <div className="grid grid-cols-6 gap-2.5 items-stretch">
             {playerHandIds.map((cardId, idx) => {
               const card = getCardById(cardId, customCards);
               if (!card) return null;
               const disabled = phase !== 'selecting' || card.staCost > playerState.sta;
-              const effPower = calculateEffectivePower(card, fighter.stats, fighter.gymId);
+              const triRatio = getTriangleDominanceBonus(
+                playerRadar,
+                aiRadar,
+                position,
+                card.strikeZone
+              );
+              const effPower = calculateEffectivePower(
+                card,
+                fighter.stats,
+                fighter.gymId,
+                playerSkills,
+                triRatio
+              );
               return (
                 <CombatCard
                   key={`${cardId}_${idx}`}
                   card={card}
                   effectivePower={effPower}
+                  triangleBonusPct={Math.round(triRatio * 100)}
                   disabled={disabled}
                   lang={lang}
                   onClick={() => handleSelectAction(card)}

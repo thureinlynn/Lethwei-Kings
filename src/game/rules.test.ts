@@ -2,17 +2,30 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { CARD_MAP } from '../data/cards';
 import {
+  applyRoundRecovery,
+  calculateEffectivePower,
   chooseAiAction,
   chooseAutoTimeoutAction,
   CombatantState,
+  computeStanceRadar,
+  createInitialSkills,
   createNewFighter,
+  DECK_SIZE,
+  drawBattleHandForRole,
   evaluateMatchOutcome,
   generateOpponent,
   getAvailableCriticalCards,
+  getTotalSkillPoints,
+  getTriangleDominanceBonus,
+  getTurnRole,
   isChampionshipUnlocked,
   MAX_ROUNDS,
+  MAX_SKILL_CAP,
+  MIN_DEFENSE_CARDS,
+  MIN_STRIKE_CARDS,
   resolveTurn,
   TURNS_PER_ROUND,
+  upgradeFighterSkill,
   validateDeck,
 } from './rules';
 
@@ -46,6 +59,8 @@ function makeCombatant(overrides: Partial<CombatantState> = {}): CombatantState 
     maxSta: 15,
     bleedTurns: 0,
     slowPenalty: 0,
+    agilityPenalty: 0,
+    submissionPct: 0,
     maniUsed: false,
     totalDamageDealt: 0,
     strikesLanded: 0,
@@ -54,10 +69,15 @@ function makeCombatant(overrides: Partial<CombatantState> = {}): CombatantState 
   };
 }
 
-test('new fighter initializes with gym bonus cards and valid 10-card starter deck', () => {
+test('new fighter initializes with gym bonus cards, 14 fight skills, and valid 40-card starter deck', () => {
   const fighter = makeTestFighter();
-  assert.equal(fighter.activeDeckIds.length, 10);
+  assert.equal(fighter.activeDeckIds.length, DECK_SIZE);
+  assert.equal(DECK_SIZE, 40);
+  assert.equal(MIN_STRIKE_CARDS, 16);
+  assert.equal(MIN_DEFENSE_CARDS, 16);
   assert.ok(fighter.unlockedCardIds.includes('spinning_elbow'));
+  assert.ok(fighter.skills);
+  assert.ok(getTotalSkillPoints(fighter.skills) > 0);
   assert.equal(validateDeck(fighter.activeDeckIds, fighter.unlockedCardIds).valid, true);
   assert.equal(isChampionshipUnlocked(fighter), false);
 });
@@ -70,10 +90,11 @@ test('championship unlocks after 3 local promotion wins', () => {
   assert.equal(isChampionshipUnlocked(fighter), true);
 });
 
-test('dynamic AI opponent generator produces valid 10-card standing deck', () => {
+test('dynamic AI opponent generator produces valid 40-card deck and fight skills', () => {
   const fighter = makeTestFighter();
   const opp = generateOpponent(fighter, 'local', () => 0.42);
-  assert.equal(opp.deckIds.length, 10);
+  assert.equal(opp.deckIds.length, DECK_SIZE);
+  assert.ok(opp.skills);
   assert.ok(opp.maxHp > 0);
   assert.ok(opp.name.length > 2);
 });
@@ -225,4 +246,183 @@ test('Timeout auto-pick selects fastest affordable card and sequential steps rec
   assert.equal(res.summary.steps[0].defenderPose, 'hit');
   assert.equal(res.summary.steps[1].actor, 'player');
   assert.equal(res.summary.steps[1].actorPose, 'elbow');
+});
+
+test('alternating turn role switches cleanly between Attack and Defense hands for Red & Blue', () => {
+  const fighter = makeTestFighter();
+  assert.equal(getTurnRole(1, 1), 'player_attack');
+  assert.equal(getTurnRole(1, 2), 'ai_attack');
+  assert.equal(getTurnRole(2, 3), 'player_attack');
+
+  const pAtkHand = drawBattleHandForRole(fighter.activeDeckIds, 'player_attack', 'player', 5);
+  assert.equal(pAtkHand.length, 5);
+  assert.ok(pAtkHand.every((id) => CARD_MAP[id].category === 'Striking'));
+
+  const pDefHand = drawBattleHandForRole(fighter.activeDeckIds, 'ai_attack', 'player', 5);
+  assert.equal(pDefHand.length, 5);
+  assert.ok(pDefHand.every((id) => CARD_MAP[id].category === 'Defense'));
+
+  const aiDefChoice = chooseAiAction(
+    ['straight_jab', 'high_guard', 'slip_evade'],
+    makeCombatant({ sta: 10 }),
+    () => 0.5,
+    'player_attack'
+  );
+  assert.notEqual(aiDefChoice, 'REST');
+  if (aiDefChoice !== 'REST') {
+    assert.equal(aiDefChoice.category, 'Defense');
+  }
+
+  const aiAtkChoice = chooseAiAction(
+    ['straight_jab', 'high_guard', 'slip_evade'],
+    makeCombatant({ sta: 10 }),
+    () => 0.5,
+    'ai_attack'
+  );
+  assert.notEqual(aiAtkChoice, 'REST');
+  if (aiAtkChoice !== 'REST') {
+    assert.equal(aiAtkChoice.category, 'Striking');
+  }
+});
+
+test('Stance Radar Triangle dominance grants +15% to +30% bonus and scales effective power', () => {
+  const headHeavyDeck = Array.from({ length: 40 }, (_, i) =>
+    i < 20 ? 'cross_counter_ii' : 'high_guard_ii'
+  );
+  const legHeavyDeck = Array.from({ length: 40 }, (_, i) =>
+    i < 20 ? 'low_kick' : 'check_leg_kick'
+  );
+
+  const headRadar = computeStanceRadar(headHeavyDeck);
+  const legRadar = computeStanceRadar(legHeavyDeck);
+
+  assert.ok(headRadar.Standing.Head > legRadar.Standing.Head);
+  const bonus = getTriangleDominanceBonus(headRadar, legRadar, 'Standing', 'Head');
+  assert.ok(bonus >= 0.15 && bonus <= 0.3);
+
+  const skills = createInitialSkills('thuwunna', 40);
+  const basePower = calculateEffectivePower(
+    CARD_MAP['cross_counter_ii'],
+    { strength: 7, speed: 7, stamina: 6, durability: 7 },
+    'thuwunna',
+    skills,
+    0
+  );
+  const boostedPower = calculateEffectivePower(
+    CARD_MAP['cross_counter_ii'],
+    { strength: 7, speed: 7, stamina: 6, durability: 7 },
+    'thuwunna',
+    skills,
+    bonus
+  );
+  assert.ok(boostedPower > basePower);
+});
+
+test('Fight Skills upgrade via XP and respect 19,000 Fighter Skill Cap', () => {
+  const fighter = makeTestFighter();
+  fighter.trainingXp = 100;
+  const ok = upgradeFighterSkill(fighter, 'Takedowns', 20, 5);
+  assert.equal(ok.upgraded, true);
+  assert.equal(ok.fighter.trainingXp, 80);
+  assert.equal(
+    ok.fighter.skills!.Takedowns,
+    fighter.skills!.Takedowns + 5
+  );
+
+  // Near cap
+  const capped = {
+    ...fighter,
+    skills: {
+      ...fighter.skills!,
+      Punches: MAX_SKILL_CAP - getTotalSkillPoints(fighter.skills) + fighter.skills!.Punches,
+    },
+  };
+  const blocked = upgradeFighterSkill(capped, 'Elbows', 20, 5);
+  assert.equal(blocked.upgraded, false);
+});
+
+test('Positional combat handles Takedown -> Ground -> Rear Naked Choke Tapout and Hip Escape', () => {
+  const tdRes = resolveTurn({
+    roundNumber: 1,
+    turnNumber: 1,
+    position: 'Standing',
+    playerChoice: CARD_MAP['double_leg_takedown'],
+    aiChoice: 'REST',
+    playerState: makeCombatant({ hp: 80 }),
+    aiState: makeCombatant({ hp: 80 }),
+    playerStats: { strength: 7, speed: 7, stamina: 6, durability: 7 },
+    aiStats: { strength: 6, speed: 6, stamina: 6, durability: 6 },
+    playerGymId: 'thuwunna',
+    rng: () => 0.1,
+  });
+  assert.equal(tdRes.summary.positionAfter, 'Ground');
+
+  // Repeated Rear Naked Choke hits 100% submission lock -> Tapout
+  const rnc1 = resolveTurn({
+    roundNumber: 1,
+    turnNumber: 3,
+    position: 'Ground',
+    playerChoice: CARD_MAP['rear_naked_choke'],
+    aiChoice: 'REST',
+    playerState: tdRes.nextPlayerState,
+    aiState: makeCombatant({ hp: 80, submissionPct: 65 }),
+    playerStats: { strength: 7, speed: 7, stamina: 6, durability: 7 },
+    aiStats: { strength: 6, speed: 6, stamina: 6, durability: 6 },
+    playerGymId: 'thuwunna',
+    rng: () => 0.5,
+  });
+  assert.equal(rnc1.nextAiState.submissionPct, 100);
+  const subOutcome = evaluateMatchOutcome(rnc1.nextPlayerState, rnc1.nextAiState, 1, 3);
+  assert.equal(subOutcome.finished, true);
+  assert.equal(subOutcome.winner, 'player');
+  assert.equal(subOutcome.method, 'Submission Victory (Tapout)');
+
+  // Hip Escape returns Ground -> Standing and drops submission progress
+  const escRes = resolveTurn({
+    roundNumber: 1,
+    turnNumber: 4,
+    position: 'Ground',
+    playerChoice: CARD_MAP['hip_escape_stand'],
+    aiChoice: 'REST',
+    playerState: makeCombatant({ hp: 70, submissionPct: 50 }),
+    aiState: makeCombatant({ hp: 70 }),
+    playerStats: { strength: 7, speed: 7, stamina: 6, durability: 7 },
+    aiStats: { strength: 6, speed: 6, stamina: 6, durability: 6 },
+    playerGymId: 'thuwunna',
+    rng: () => 0.5,
+  });
+  assert.equal(escRes.summary.positionAfter, 'Standing');
+  assert.equal(escRes.nextPlayerState.submissionPct, 10);
+});
+
+test('Condition drives between-round stamina recovery and Low Kick penalizes Agility', () => {
+  const lowCondition = applyRoundRecovery(makeCombatant({ sta: 2, maxSta: 20 }), {
+    strength: 6,
+    speed: 6,
+    stamina: 3,
+    durability: 6,
+  });
+  const highCondition = applyRoundRecovery(makeCombatant({ sta: 2, maxSta: 20 }), {
+    strength: 6,
+    speed: 6,
+    stamina: 12,
+    durability: 6,
+  });
+  assert.ok(highCondition.sta > lowCondition.sta);
+
+  const lkRes = resolveTurn({
+    roundNumber: 1,
+    turnNumber: 1,
+    position: 'Standing',
+    playerChoice: CARD_MAP['low_kick'],
+    aiChoice: 'REST',
+    playerState: makeCombatant(),
+    aiState: makeCombatant(),
+    playerStats: { strength: 6, speed: 6, stamina: 6, durability: 6 },
+    aiStats: { strength: 6, speed: 6, stamina: 6, durability: 6 },
+    playerGymId: 'tiger_mt',
+    rng: () => 0.5,
+  });
+  assert.equal(lkRes.nextAiState.agilityPenalty, 1);
+  assert.equal(lkRes.nextAiState.slowPenalty, 1);
 });

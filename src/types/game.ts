@@ -15,38 +15,98 @@ export type Discipline =
   | 'Muay Thai'
   | 'Kickboxing'
   | 'Boxing'
-  | 'Karate';
+  | 'Karate'
+  | 'Wrestling'
+  | 'BJJ'
+  | 'MMA';
 
 export type CardCategory = 'Striking' | 'Defense' | 'Critical';
 
+export type CardTier = 'I' | 'II' | 'III';
+
+export type CombatPosition = 'Standing' | 'Clinch' | 'Ground';
+
 export type StrikeZone = 'Head' | 'Body' | 'Legs' | 'Clinch' | 'All';
+
+export type OffenseSkillKey =
+  | 'Punches'
+  | 'Elbows'
+  | 'Knees'
+  | 'High_Kicks'
+  | 'Low_Kicks'
+  | 'Clinchwork'
+  | 'Takedowns'
+  | 'Ground_Grappling'
+  | 'Submission';
+
+export type DefenseSkillKey =
+  | 'Strike_Def'
+  | 'Knees_Def'
+  | 'Kick_Def'
+  | 'Takedown_Def'
+  | 'Submission_Def';
+
+export type FightSkillKey = OffenseSkillKey | DefenseSkillKey;
+
+export type FightSkills = Record<FightSkillKey, number>;
+
+export interface ZoneRadar {
+  Head: number;
+  Body: number;
+  Legs: number;
+}
+
+export interface StanceRadar {
+  Standing: ZoneRadar;
+  Ground: ZoneRadar;
+}
 
 export type CardArtType =
   | 'jab'
+  | 'cross'
   | 'hook'
   | 'uppercut'
+  | 'superman'
   | 'roundhouse'
   | 'sidekick'
+  | 'teep'
   | 'lowkick'
+  | 'axekick'
   | 'elbow'
+  | 'upwardelbow'
   | 'knee'
   | 'headbutt'
   | 'slam'
+  | 'takedown'
+  | 'groundpound'
+  | 'submission'
+  | 'escape'
   | 'block'
   | 'evade'
   | 'sprawl'
   | 'catchkick'
   | 'parry'
+  | 'shincheck'
+  | 'shoulderroll'
+  | 'longguard'
   | 'mani'
   | 'desperation'
   | 'surge'
   | 'groggy';
+
+export type TurnRole = 'player_attack' | 'ai_attack';
+
+export type CameraAngle = 'auto' | 'side' | 'corner' | 'high' | 'cover';
 
 export interface CombatCard {
   id: string;
   name: string;
   discipline: Discipline;
   category: CardCategory;
+  tier?: CardTier;
+  position?: CombatPosition | 'Any';
+  targetPosition?: CombatPosition;
+  skillKey?: FightSkillKey;
   staCost: number;
   power: number; // DMG for Striking, DEF for Defense, heal/effect magnitude for Critical
   speed: number; // Lower = strikes first! (1 = fastest, 5 = heaviest/slowest)
@@ -67,7 +127,12 @@ export interface CombatCard {
     | 'parry_counter'
     | 'mani_heal'
     | 'adrenaline_sta'
-    | 'prevent_ko';
+    | 'prevent_ko'
+    | 'takedown'
+    | 'enter_clinch'
+    | 'stand_up'
+    | 'submission_lock'
+    | 'submission_escape';
 }
 
 export interface FighterAppearance {
@@ -82,10 +147,10 @@ export interface FighterAppearance {
 }
 
 export interface FighterStats {
-  strength: number;   // Boosts Striking DMG
-  speed: number;      // Ties / priority & evade edge
-  stamina: number;    // Boosts Max STA
-  durability: number; // Boosts Max HP
+  strength: number;   // Strength: flat physical damage on strikes & slams
+  speed: number;      // Agility: evasion chance, crit chance, initiative ties
+  stamina: number;    // Condition: max stamina pool & per-round stamina recovery
+  durability: number; // Health: max HP & base block absorption
 }
 
 export type GymId = 'thuwunna' | 'golden_land' | 'tiger_mt';
@@ -124,6 +189,7 @@ export interface FighterProfile {
   appearance: FighterAppearance;
   gymId: GymId;
   stats: FighterStats;
+  skills?: FightSkills;
   currentHp: number;
   maxHp: number;
   currentSta: number;
@@ -131,7 +197,7 @@ export interface FighterProfile {
   trainingXp: number;
   trainingDays: number;
   unlockedCardIds: string[];
-  activeDeckIds: string[]; // Exactly 10 cards when ready
+  activeDeckIds: string[]; // Exactly 40 cards when ready
   customCards?: CombatCard[];
   record: FighterRecord;
 }
@@ -149,6 +215,7 @@ export interface OpponentProfile {
   background?: string;
   appearance: FighterAppearance;
   stats: FighterStats;
+  skills?: FightSkills;
   maxHp: number;
   maxSta: number;
   deckIds: string[];
@@ -168,6 +235,10 @@ export type FighterPose =
   | 'knee'
   | 'headbutt'
   | 'slam'
+  | 'takedown'
+  | 'groundpound'
+  | 'submission'
+  | 'escape'
   | 'block'
   | 'evade'
   | 'parry'
@@ -194,6 +265,8 @@ export interface TurnExchangeStep {
   evaded: boolean;
   cutApplied: boolean;
   isHeavy: boolean;
+  positionAfter?: CombatPosition;
+  triangleBonusPct?: number;
 }
 
 export interface TurnResolutionSummary {
@@ -212,6 +285,8 @@ export interface TurnResolutionSummary {
   aiCutApplied: boolean;
   playerHealed: number;
   aiHealed: number;
+  positionAfter: CombatPosition;
+  triangleBonusAppliedPct: number;
   steps: TurnExchangeStep[];
   logs: string[];
 }

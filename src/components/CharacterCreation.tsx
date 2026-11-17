@@ -676,10 +676,10 @@ export const CharacterCreation: React.FC<CharacterCreationProps> = ({
                 <div className="grid grid-cols-2 gap-3.5">
                   {(
                     [
-                      { key: 'strength', label: t.strength, desc: lang === 'my' ? 'တိုက်ခိုက်အား DMG တိုးသည်' : 'Boosts Striking DMG', color: 'text-red-400' },
-                      { key: 'speed', label: t.speed, desc: lang === 'my' ? 'SPD အမြန်ဦးစားပေး & ရှောင်တိမ်း' : 'SPD ties & Slip/Evade', color: 'text-emerald-400' },
-                      { key: 'stamina', label: t.stamina, desc: lang === 'my' ? 'Max STA တိုးသည်' : 'Boosts Max STA', color: 'text-sky-400' },
-                      { key: 'durability', label: t.durability, desc: lang === 'my' ? 'Max HP & ကာကွယ်အား တိုးသည်' : 'Boosts Max HP & Block', color: 'text-amber-400' },
+                      { key: 'strength', label: t.strength, desc: lang === 'my' ? 'တိုက်ခိုက်အားနှင့် ပေါက်ချအား DMG တိုးသည်' : 'Flat physical DMG on strikes & slams', color: 'text-red-400' },
+                      { key: 'speed', label: t.speed, desc: lang === 'my' ? 'ရှောင်တိမ်း၊ Crit နှင့် အမြန်ဦးစားပေး' : 'Evasion, Crit chance & Turn Initiative', color: 'text-emerald-400' },
+                      { key: 'stamina', label: t.stamina, desc: lang === 'my' ? 'အများဆုံး STA နှင့် အချီပြန်ဖြည့်အား' : 'Max Condition pool & Round recovery', color: 'text-sky-400' },
+                      { key: 'durability', label: t.durability, desc: lang === 'my' ? 'အများဆုံး HP နှင့် ကာကွယ်အား တိုးသည်' : 'Max Health (HP) & Guard absorption', color: 'text-amber-400' },
                     ] as const
                   ).map((item) => {
                     const val = stats[item.key];

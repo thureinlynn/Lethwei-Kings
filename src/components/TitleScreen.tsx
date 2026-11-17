@@ -99,7 +99,7 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
                 fontSize="20"
                 letterSpacing="4"
               >
-                MYANMAR LETHWEI · STAND-UP FEDERATION
+                MYANMAR LETHWEI · TACTICAL MMA
               </text>
               <text
                 x="12"
@@ -299,7 +299,7 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
               <div className="flex items-center justify-between pt-1 text-xs text-zinc-400">
                 <span className="flex items-center gap-1.5">
                   <Shield className="w-4 h-4 text-sky-400" aria-hidden="true" />
-                  {lang === 'my' ? 'ကတ်တွဲ စီမံခန်းတွင် ကတ် ၁၀ ခု ရွေးချယ်နိုင်သည်' : '10-card Fight Deck in Game Plan'}
+                  {lang === 'my' ? 'ကတ်တွဲ စီမံခန်းတွင် ကတ် ၄၀ ရွေးချယ်နိုင်သည်' : '40-card Fight Deck in Game Plan'}
                 </span>
                 <span className="flex items-center gap-1.5">
                   <Trophy className="w-4 h-4 text-amber-400" aria-hidden="true" />
